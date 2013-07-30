@@ -15,7 +15,7 @@
         <span data-bind="matchup: [0, 0]"></span><br>
       <!-- /ko -->
       <!-- ko if: !showPlayoffSeries() -->
-        <span data-bind="text: rank"></span>th place in conference<br>
+        <span class="ordinal" data-bind="text: rank"></span> place in conference<br>
         (Top 8 teams make the playoffs)<br>
       <!-- /ko -->
       <!-- ko if: playoffsStarted -->
@@ -53,10 +53,10 @@
   <div class="span4">
     <h3>Team Stats</h3>
     <p>
-      Points: <span data-bind="round: [pts, 1]"></span> (<span data-bind="text: ptsRank"></span>th)<br>
-      Allowed: <span data-bind="round: [oppPts, 1]"></span> (<span data-bind="text: oppPtsRank"></span>th)<br>
-      Rebounds: <span data-bind="round: [trb, 1]"></span> (<span data-bind="text: trbRank"></span>th)<br>
-      Assists: <span data-bind="round: [ast, 1]"></span> (<span data-bind="text: astRank"></span>th)<br>
+      Points: <span data-bind="round: [pts, 1]"></span> (<span class="ordinal" data-bind="text: ptsRank"></span>)<br>
+      Allowed: <span data-bind="round: [oppPts, 1]"></span> (<span class="ordinal" data-bind="text: oppPtsRank"></span>)<br>
+      Rebounds: <span data-bind="round: [trb, 1]"></span> (<span class="ordinal" data-bind="text: trbRank"></span>)<br>
+      Assists: <span data-bind="round: [ast, 1]"></span> (<span class="ordinal" data-bind="text: astRank"></span>)<br>
       <a data-bind="attrLeagueUrl: {href: ['team_stats']}">» Team Stats</a>
     </p>
 
@@ -110,3 +110,42 @@
     </p>
   </div>
 </div>
+
+<script type="text/javascript">
+// extend Number object with .ordinate() : void => string
+// turns a number into its ordinal suffix form 
+// 1 => 1st, 2 => 2nd, 3 => 3rd,
+// 11 => 11th, 22 => 22nd, 33 => 33rd 
+Number.prototype.ordinate = function(){
+    var num = this.toString(),
+        last = num.slice(-1),
+        teen = num.slice(-2),
+        ord = '';
+    if (teen == '1')
+        return 'th';
+    switch (last) {
+        case '1':
+            ord = 'st';
+            break;
+        case '2':
+            ord = 'nd';
+            break;
+        case '3':
+            ord = 'rd';
+            break;
+        default:
+            ord = 'th';
+            break;
+    }
+    return num.toString() + ord;
+};
+
+// jQuery .text() : (f : int * string => string) => string
+// inner anonymous function replaces postpends number with its ordinal suffix  
+// outer script applies this format to any tag using "ordinal" class
+$(".ordinal").text(function (i,t) {
+    return t.replace(/(\d+)/g, function(a){
+        return parseInt(a, 10).ordinate();
+    });
+});
+</script>
