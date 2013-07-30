@@ -119,10 +119,10 @@
 Number.prototype.ordinate = function(){
     var num = this.toString(),
         last = num.slice(-1),
-        teen = num.slice(-2),
+        teen = num.slice(-2,-1),
         ord = '';
     if (teen == '1')
-        return 'th';
+        return num + 'th';
     switch (last) {
         case '1':
             ord = 'st';
@@ -137,7 +137,7 @@ Number.prototype.ordinate = function(){
             ord = 'th';
             break;
     }
-    return num.toString() + ord;
+    return num + ord;
 };
 
 // jQuery .text() : (f : int * string => string) => string
