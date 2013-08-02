@@ -13,7 +13,7 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
      * @param {number} tid The team ID for the team the user wants to manage.
      * @param {Array.<Object>?} players Either an array of pre-generated player objects to use in the new league or undefined. If undefined, then random players will be generated.
      */
-    function create(name, tid, players, cb) {
+    function create(name, tid, players, startingSeason, cb) {
         var l, leagueStore;
 
         l = {name: name, tid: tid, phaseText: ""};
@@ -27,9 +27,8 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
 
             // Create new league database
             db.connectLeague(g.lid, function () {
-                var gameAttributes, key, startingSeason;
+                var gameAttributes, key;
 
-                startingSeason = 2013;
                 gameAttributes = {
                     userTid: tid,
                     season: startingSeason,
@@ -153,6 +152,9 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
                                 }
                                 if (!p.hasOwnProperty("salaries")) {
                                     p.salaries = [];
+                                    if (p.contract.exp < g.startingSeason) {
+                                        p.contract.exp = g.startingSeason;
+                                    }
                                     if (p.tid >= 0) {
                                         p = player.setContract(p, p.contract, true);
                                     }

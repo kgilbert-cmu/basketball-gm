@@ -162,7 +162,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         }
 
         expiration = g.season + years - 1;
-        if (amount < minAmount) {
+        if (amount < minAmount * 1.1) {
             amount = minAmount;
         } else if (amount > maxAmount) {
             amount = maxAmount;
@@ -426,6 +426,8 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         }
 
         p.tid = g.PLAYER.FREE_AGENT;
+
+        p.ptModifier = 1; // Reset
 
         require("db").getObjectStore(ot, "players", "players").put(p);
 
@@ -703,13 +705,13 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         }
 
         minHgt = 70;  // 5'10"
-        maxHgt = 83;  // 6'11"
+        maxHgt = 85;  // 7'1"
         minWeight = 150;
         maxWeight = 290;
 
         p.pos = pos(p.ratings[0]);  // Position (PG, SG, SF, PF, C, G, GF, FC)
-        p.hgt = Math.round(random.gauss(1, 0.02) * (p.ratings[0].hgt * (maxHgt - minHgt) / 100 + minHgt));  // Height in inches (from minHgt to maxHgt)
-        p.weight = Math.round(random.gauss(1, 0.02) * ((p.ratings[0].hgt + 0.5 * p.ratings[0].stre) * (maxWeight - minWeight) / 150 + minWeight));  // Weight in pounds (from minWeight to maxWeight)
+        p.hgt = Math.round(random.randInt(-2, 2) + p.ratings[0].hgt * (maxHgt - minHgt) / 100 + minHgt);  // Height in inches (from minHgt to maxHgt)
+        p.weight = Math.round(random.randInt(-20, 20) + (p.ratings[0].hgt + 0.5 * p.ratings[0].stre) * (maxWeight - minWeight) / 150 + minWeight);  // Weight in pounds (from minWeight to maxWeight)
 
         // Randomly choose nationality  
         nationality = 'USA';
@@ -911,7 +913,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
                     fp.ratings = {};
                     for (j = 0; j < options.ratings.length; j++) {
                         fp.ratings[options.ratings[j]] = pr[options.ratings[j]];
-                        if (options.fuzz && options.ratings[j] !== "fuzz" && options.ratings[j] !== "season" && options.ratings[j] !== "skills") {
+                        if (options.fuzz && options.ratings[j] !== "fuzz" && options.ratings[j] !== "season" && options.ratings[j] !== "skills" && options.ratings[j] !== "hgt") {
                             fp.ratings[options.ratings[j]] = Math.round(helpers.bound(fp.ratings[options.ratings[j]] + pr.fuzz, 0, 100));
                         }
                     }
@@ -954,7 +956,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
                             }
                         } else {
                             fp.ratings[kk][options.ratings[j]] = p.ratings[k][options.ratings[j]];
-                            if (options.fuzz && options.ratings[j] !== "fuzz" && options.ratings[j] !== "season" && options.ratings[j] !== "skills") {
+                            if (options.fuzz && options.ratings[j] !== "fuzz" && options.ratings[j] !== "season" && options.ratings[j] !== "skills" && options.ratings[j] !== "hgt") {
                                 fp.ratings[kk][options.ratings[j]] = Math.round(helpers.bound(p.ratings[k][options.ratings[j]] + p.ratings[k].fuzz, 0, 100));
                             }
                         }

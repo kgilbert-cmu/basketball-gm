@@ -498,13 +498,13 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
     }
 
     function newPhaseRegularSeason(cb) {
-        var checkRosterSize, phaseText, playerStore, tx, userTeamSizeError;
+        var checkRosterSize, minFreeAgents, phaseText, playerStore, players, tx, userTeamSizeError;
 
         phaseText = g.season + " regular season";
 
         checkRosterSize = function (tid) {
             playerStore.index("tid").getAll(tid).onsuccess = function (event) {
-                var i, numPlayersOnRoster, players, playersAll;
+                var i, numPlayersOnRoster, p, players, playersAll;
 
                 playersAll = event.target.result;
                 numPlayersOnRoster = playersAll.length;
@@ -531,9 +531,18 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
                         helpers.error("Your team currently has less than the minimum number of players (5). You must add players (through free agency or trades) before the season starts.");
                         userTeamSizeError = true;
                         ui.updatePlayMenu();  // Otherwise the play menu will be blank
-                    }/* else {
-                        // Should auto-add players
-                    }*/
+                    } else {
+                        // Auto-add players
+                        while (numPlayersOnRoster < 5) {
+                            p = minFreeAgents.shift();
+                            p.tid = tid;
+                            p = player.addStatsRow(p);
+                            p = player.setContract(p, p.contract, true);
+                            playerStore.put(p);
+
+                            numPlayersOnRoster += 1;
+                        }
+                    }
                 }
 
                 // Auto sort rosters (except player's team)
@@ -548,14 +557,29 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
 
         userTeamSizeError = false;
 
-        // Make sure teams are all within the roster limits
-        tx.objectStore("teams").getAll().onsuccess = function (event) {
-            var i, teams;
+        playerStore.index("tid").getAll(g.PLAYER.FREE_AGENT).onsuccess = function (event) {
+            var i, players;
 
-            teams = event.target.result;
-            for (i = 0; i < teams.length; i++) {
-                checkRosterSize(teams[i].tid);
+            players = event.target.result;
+
+            // List of free agents looking for minimum contracts, sorted by value. This is used to bump teams up to the minimum roster size.
+            minFreeAgents = [];
+            for (i = 0; i < players.length; i++) {
+                if (players[i].contract.amount === 500) {
+                    minFreeAgents.push(players[i]);
+                }
             }
+            minFreeAgents.sort(function (a, b) { return player.value(b) - player.value(a); });
+
+            // Make sure teams are all within the roster limits
+            tx.objectStore("teams").getAll().onsuccess = function (event) {
+                var i, teams;
+
+                teams = event.target.result;
+                for (i = 0; i < teams.length; i++) {
+                    checkRosterSize(teams[i].tid);
+                }
+            };
         };
 
         tx.oncomplete = function () {
@@ -691,7 +715,7 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
 
         phaseText = g.season + " before draft";
 
-        tx = g.dbl.transaction(["messages", "players"], "readwrite");
+        tx = g.dbl.transaction(["messages", "players", "teams"], "readwrite");
 
         if (g.season === g.startingSeason + 3 && g.lid > 3 && !localStorage.nagged) {
             tx.objectStore("messages").add({
@@ -703,6 +727,37 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
             });
             localStorage.nagged = true;
         }
+
+        // Add award for each player on the championship team
+        team.filter({
+            attrs: ["tid"],
+            seasonAttrs: ["playoffRoundsWon"],
+            season: g.season,
+            ot: tx
+        }, function (teams) {
+            var i, tid;
+
+            for (i = 0; i < teams.length; i++) {
+                if (teams[i].playoffRoundsWon === 4) {
+                    tid = teams[i].tid;
+                    break;
+                }
+            }
+
+            tx.objectStore("players").index("tid").openCursor(tid).onsuccess = function (event) {
+                var cursor, p;
+
+                cursor = event.target.result;
+                if (cursor) {
+                    p = cursor.value;
+
+                    p.awards.push({season: g.season, type: "Won Championship"});
+
+                    cursor.update(p);
+                    cursor.continue();
+                }
+            };
+        });
 
         // Do annual tasks for each player, like checking for retirement
         tx.objectStore("players").index("tid").openCursor(IDBKeyRange.lowerBound(g.PLAYER.RETIRED, true)).onsuccess = function (event) { // All non-retired players
