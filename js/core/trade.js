@@ -258,7 +258,7 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                     s.teams[i].total = _.reduce(s.teams[i].trade, function (memo, player) { return memo + player.contract.amount; }, 0);
 
                     transaction.objectStore("draftPicks").index("tid").getAll(tids[i]).onsuccess = function (event) {
-                        var j, k, overCap, overRosterLimit, picks, ratios, teams;
+                        var j, k, overCap, overRosterLimit, picks, ratios;
 
                         picks = event.target.result;
                         s.teams[i].picks = [];
@@ -272,8 +272,6 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                         if (done === 2) {
                             done = 0;
 
-                            teams = helpers.getTeams();
-
                             // Test if any warnings need to be displayed
                             overCap = [false, false];
                             overRosterLimit = [false, false];
@@ -285,7 +283,7 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                                     k = 0;
                                 }
 
-                                s.teams[j].name = teams[tids[j]].region + " " + teams[tids[j]].name;
+                                s.teams[j].name = g.teamRegionsCache[tids[j]] + " " + g.teamNamesCache[tids[j]];
 
                                 if (players[j].length - pids[j].length + pids[k].length > 15) {
                                     overRosterLimit[j] = true;
@@ -411,13 +409,11 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                     outcome = "rejected"; // Default
 
                     team.valueChange(otherTid, userPids, otherPids, userDpids, otherDpids, function (dv) {
-                        var draftPickStore, j, playerStore, teams, tx;
+                        var draftPickStore, j, playerStore, tx;
 
                         tx = g.dbl.transaction(["draftPicks", "players"], "readwrite");
                         draftPickStore = tx.objectStore("draftPicks");
                         playerStore = tx.objectStore("players");
-
-                        teams = helpers.getTeams();
 
                         if (dv > 0) {
                             // Trade players
@@ -457,7 +453,7 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                                                 cursor = event.target.result;
                                                 dp = cursor.value;
                                                 dp.tid = tids[k];
-                                                dp.abbrev = teams[tids[k]].abbrev;
+                                                dp.abbrev = g.teamAbbrevsCache[tids[k]];
                                                 cursor.update(dp);
                                             };
                                         }(l));
@@ -493,12 +489,12 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
      * @param {function(boolean, string)} cb Callback function. The argument is a string containing a message to be dispalyed to the user, as if it came from the AI GM.
      */
     function makeItWork(cb) {
-        var teams, tryAddAsset, testTrade;
-
-        teams = helpers.getTeams();
-
         getPlayers(function (userPids, otherPids, userDpids, otherDpids) {
             getOtherTid(function (otherTid) {
+                var added, tryAddAsset, testTrade;
+
+                added = 0;
+
                 // Add either the highest value asset or the lowest value one that makes the trade good for the AI team.
                 tryAddAsset = function () {
                     var assets, tx;
@@ -548,6 +544,12 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                     tx.oncomplete = function () {
                         var done, i, newUserPids, newUserDpids;
 
+                        // If we've already added 5 assets or there are no more to try, stop
+                        if (assets.length === 0 || added >= 5) {
+                            cb(g.teamRegionsCache[otherTid] + ' GM: "I can\'t afford to give up so much."');
+                            return;
+                        }
+
                         // Calculate the value for each asset added to the trade, for use in forward selection
                         done = 0;
                         for (i = 0; i < assets.length; i++) {
@@ -585,14 +587,12 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                                             userDpids.push(asset.dpid);
                                         }
 
+                                        added += 1;
+
                                         testTrade();
                                     }
                                 });
-                            })(i);
-                        }
-
-                        if (assets.length === 0) {
-                            cb(teams[otherTid].region + ' GM: "I can\'t afford to give up so much."');
+                            }(i));
                         }
                     };
                 };
@@ -602,7 +602,7 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                     team.valueChange(otherTid, userPids, otherPids, userDpids, otherDpids, function (dv) {
                         if (dv > 0) {
                             summary(otherTid, userPids, otherPids, userDpids, otherDpids, function (s) {
-                                var i, outcome, tx;
+                                var tx;
 
                                 // Store AI's proposed trade in database
                                 tx = g.dbl.transaction("trade", "readwrite");
@@ -629,9 +629,9 @@ define(["db", "globals", "core/player", "core/team", "lib/underscore", "util/hel
                                 };
                                 tx.oncomplete = function () {
                                     if (s.warning) {
-                                        cb(teams[otherTid].region + ' GM: "Something like this would work if you can figure out how to get it done without breaking any rules."');
+                                        cb(g.teamRegionsCache[otherTid] + ' GM: "Something like this would work if you can figure out how to get it done without breaking any rules."');
                                     } else {
-                                        cb(teams[otherTid].region + ' GM: "How does this sound?"');
+                                        cb(g.teamRegionsCache[otherTid] + ' GM: "How does this sound?"');
                                     }
                                 };
                             });

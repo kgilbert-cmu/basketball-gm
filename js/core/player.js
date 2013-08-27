@@ -214,7 +214,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
      * @return {Object} Updated player object.
      */
     function develop(p, years, generate, coachingRank) {
-        var age, baseChange, i, j, ratingKeys, r, sigma;
+        var age, baseChange, i, j, ratingKeys, r, sigma, sign;
 
         years = years !== undefined ? years : 1;
         generate = generate !== undefined ? generate : false;
@@ -268,11 +268,12 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
             }
 
             // Modulate by coaching
-            var sign = baseChange ? baseChange < 0 ? -1 : 1 : 0;
-            if (sign >= 0) // life is normal
+            sign = baseChange ? baseChange < 0 ? -1 : 1 : 0;
+            if (sign >= 0) { // life is normal
                 baseChange *= ((coachingRank - 1) * (-0.5) / 29 + 1.25);
-            else
-                baseChange *= ((coachingRank - 1) * (0.5) / 29 + .75);
+            } else {
+                baseChange *= ((coachingRank - 1) * (0.5) / 29 + 0.75);
+            }
 
             ratingKeys = ['stre', 'spd', 'jmp', 'endu', 'ins', 'dnk', 'ft', 'fg', 'tp', 'blk', 'stl', 'drb', 'pss', 'reb'];
             for (j = 0; j < ratingKeys.length; j++) {
@@ -511,7 +512,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         profiles = [[10,  10,  10,  10,  10,  10,  10,  10,  10,  25,  10,  10,  10,  10,  10],  // Base 
                     [-30, -10, 40,  15,  0,   0,   0,   10,  15,  15,   0,   20,  40,  40,  0],   // Point Guard
                     [10,  10,  15,  15,  0,   0,   25,  15,  15,  20,   0,   10,  15,  0,   15],  // Wing
-                    [50,  35,  -10, -10, 0,  35,  35,  0,   -10, -15, 30,  0,   -10, -10, 35]];  // Big
+                    [45,  30,  -15, -15, -5,  30,  30,  -5,   -15, -20, 25,  -5,   -20, -20, 30]];  // Big
         sigmas = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
         baseRating = random.gauss(baseRating, 5);
 
@@ -526,6 +527,15 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         for (i = 0; i < ratingKeys.length; i++) {
             key = ratingKeys[i];
             ratings[key] = rawRatings[i];
+        }
+
+        // Ugly hack: Tall people can't dribble/pass very well
+        if (ratings.hgt > 40) {
+            ratings.drb = limitRating(ratings.drb - (ratings.hgt - 50));
+            ratings.pss = limitRating(ratings.pss - (ratings.hgt - 50));
+        } else {
+            ratings.drb = limitRating(ratings.drb + 10);
+            ratings.pss = limitRating(ratings.pss + 10);
         }
 
         ratings.season = season;
@@ -672,8 +682,6 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
      * @return {Object} Updated player object.
      */
     function addStatsRow(p, playoffs) {
-        var key, newStats;
-
         playoffs = playoffs !== undefined ? playoffs : false;
 
         p.stats.push({season: g.season, tid: p.tid, playoffs: playoffs, gp: 0, gs: 0, min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, orb: 0, drb: 0, trb: 0, ast: 0, tov: 0, stl: 0, blk: 0, pf: 0, pts: 0, per: 0});
@@ -704,7 +712,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
             p.ratings.push(genRatings(profile, baseRating, pot, draftYear, scoutingRank));
         }
 
-        minHgt = 70;  // 5'10"
+        minHgt = 71;  // 5'11"
         maxHgt = 85;  // 7'1"
         minWeight = 150;
         maxWeight = 290;
@@ -722,6 +730,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
 
         p.name = name(nationality);
         p.college = "";
+        p.imgURL = ""; // Custom rosters can define player image URLs to be used rather than vector faces
 
         p.salaries = [];
         p = setContract(p, genContract(p), false);
@@ -838,7 +847,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
 
         // Copys/filters the attributes listed in options.attrs from p to fp.
         filterAttrs = function (fp, p, options) {
-            var i;
+            var award, awardsGroupedTemp, i;
 
             for (i = 0; i < options.attrs.length; i++) {
                 if (options.attrs[i] === "age") {
@@ -863,13 +872,13 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
                     fp.abbrev = helpers.getAbbrev(p.tid);
                 } else if (options.attrs[i] === "teamRegion") {
                     if (p.tid >= 0) {
-                        fp.teamRegion = helpers.getTeams()[p.tid].region;
+                        fp.teamRegion = g.teamRegionsCache[p.tid];
                     } else {
                         fp.teamRegion = "";
                     }
                 } else if (options.attrs[i] === "teamName") {
                     if (p.tid >= 0) {
-                        fp.teamName = helpers.getTeams()[p.tid].name;
+                        fp.teamName = g.teamNamesCache[p.tid];
                     } else if (p.tid === g.PLAYER.FREE_AGENT) {
                         fp.teamName = "Free Agent";
                     } else if (p.tid === g.PLAYER.UNDRAFTED) {
@@ -885,6 +894,18 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
                     fp.salariesTotal = _.reduce(fp.salaries, function (memo, salary) { return memo + salary.amount; }, 0);
                 } else if (options.attrs[i] === "value") {
                     fp.value = value(p);
+                } else if (options.attrs[i] === "awardsGrouped") {
+                    fp.awardsGrouped = [];
+                    awardsGroupedTemp = _.groupBy(p.awards, function (award) { return award.type; });
+                    for (award in awardsGroupedTemp) {
+                        if (awardsGroupedTemp.hasOwnProperty(award)) {
+                            fp.awardsGrouped.push({
+                                type: award,
+                                count: awardsGroupedTemp[award].length,
+                                seasons: _.pluck(awardsGroupedTemp[award], "season")
+                            });
+                        }
+                    }
                 } else {
                     fp[options.attrs[i]] = p[options.attrs[i]];
                 }
@@ -1259,32 +1280,25 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
     }
 
     /**
-     * Returns a numeric value for a given player, representing is general worth to a typical team (i.e. ignoring how well he fits in with his teammates and the team's strategy/finances). It is similar in scale to the overall and potential ratings of players, but it is based on stats in addition to ratings. The main components are:
+     * Returns a numeric value for a given player, representing is general worth to a typical team
+     * (i.e. ignoring how well he fits in with his teammates and the team's strategy/finances). It
+     * is similar in scale to the overall and potential ratings of players (0-100), but it is based
+     * on stats in addition to ratings. The main components are:
      *
-     * 1. Recent stats: Avg of last 2 seasons' PER if min > 2000. Otherwise, scale by min / 2000 and correspondingly increase the weight of #2.
-     * 2. Current ratings: This is similar to "the eye test" - how does a player look? This is generally the least important of the 3.
-     * 3. Potential for improvement (or risk for decline): Based on age and potential rating.
+     * 1. Recent stats: Avg of last 2 seasons' PER if min > 2000. Otherwise, scale by min / 2000 and
+     *     use ratings to estimate the rest.
+     * 2. Potential for improvement (or risk for decline): Based on age and potential rating.
      *
      * @memberOf core.player
      * @param {Object} p Player object.
-     * @return {boolean} Value of the player, usually between 50 and 100 like overall and potential ratings.
+     * @return {boolean} Value of the player, usually between 50 and 100 like overall and potential
+     *     ratings.
      */
     function value(p) {
-        var age, c, i, ps, ps1, ps2, w;
+        var age, current, i, potential, pr, ps, ps1, ps2;
 
-        // Components
-        c = {
-            stats: 0,
-            ovr: 0,
-            pot: 0
-        };
-
-        // Weights for linear combination
-        w = {
-            stats: 2,
-            ovr: 1,
-            pot: 1
-        };
+        // Current ratings
+        pr = _.last(p.ratings);
 
         // Regular season stats ONLY, in order starting with most recent
         ps = [];
@@ -1295,76 +1309,75 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         }
         ps.reverse();
 
-        // 1. Account for stats
+        // 1. Account for stats (and current ratings if not enough stats)
+        current = 0;
         if (ps.length === 0) {
             // No stats at all? Just look at ratings more, then.
-            c.stats = 0;
-            w.ovr += w.stats;
-            w.stats = 0;
+            current = pr.ovr;
         } else if (ps.length === 1) {
             // Only one year of stats
-            c.stats = ps[0].per;
+            current = 4 * ps[0].per;
             if (ps[0].min < 2000) {
-                w.ovr += w.stats * (1 - ps[0].min / 2000);
-                w.stats *= ps[0].min / 2000;
+                current = current * ps[0].min / 2000 + pr.ovr * (1 - ps[0].min / 2000);
             }
         } else {
             // Two most recent seasons
             ps1 = ps[0];
             ps2 = ps[1];
             if (ps1.min + ps2.min > 0) {
-                c.stats = (ps1.per * ps1.min + ps2.per * ps2.min) / (ps1.min + ps2.min);
+                current = 4 * (ps1.per * ps1.min + ps2.per * ps2.min) / (ps1.min + ps2.min);
             }
             if (ps1.min + ps2.min < 2000) {
-                w.ovr += w.stats * (1 - (ps1.min + ps2.min) / 2000);
-                w.stats *= (ps1.min + ps2.min) / 2000;
+                current = current * (ps1.min + ps2.min) / 2000 + pr.ovr * (1 - (ps1.min + ps2.min) / 2000);
             }
         }
 
-        // 2. Account for current ratings
-        c.ovr = _.last(p.ratings).ovr;
+        // 2. Potential
+        potential = pr.pot;
 
-        // 3. Account for future projections
-        c.pot = _.last(p.ratings).pot;
+        // If performance is already exceeding predicted potential, just use that
+        if (current >= potential && age < 31) {
+            return current;
+        }
+
+        // Otherwise, combine based on age
         age = g.season - p.born.year;
         if (age <= 19) {
-            c.pot = 1.7 * (c.pot + c.ovr) / 2;
+            return 0.8 * potential + 0.2 * current;
         }
         if (age === 20) {
-            c.pot = 1.4 * (0.75 * c.pot + 1.25 * c.ovr) / 2;
+            return 0.7 * potential + 0.3 * current;
         }
         if (age === 21) {
-            c.pot = 1.2 * (0.5 * c.pot + 1.5 * c.ovr) / 2;
+            return 0.5 * potential + 0.5 * current;
         }
         if (age === 22) {
-            c.pot = 1.1 * (0.25 * c.pot + 1.75 * c.ovr) / 2;
+            return 0.3 * potential + 0.7 * current;
         }
-        if (age === 28) {
-            c.pot *= 0.95;
+        if (age === 23) {
+            return 0.15 * potential + 0.85 * current;
         }
-        if (age === 29) {
-            c.pot *= 0.95;
+        if (age === 24) {
+            return 0.1 * potential + 0.9 * current;
         }
-        if (age === 30) {
-            c.pot *= 0.9;
+        if (age === 25) {
+            return 0.05 * potential + 0.95 * current;
+        }
+        if (age > 25 && age < 31) {
+            return current;
         }
         if (age === 31) {
-            c.pot *= 0.85;
+            return 0.975 * current;
         }
         if (age === 32) {
-            c.pot *= 0.8;
+            return 0.95 * current;
         }
         if (age === 33) {
-            c.pot *= 0.7;
+            return 0.925 * current;
         }
-        if (age === 34) {
-            c.pot *= 0.6;
+        if (age > 33) {
+            return 0.9 * current;
         }
-        if (age >= 35) {
-            c.pot *= 0.5;
-        }
-
-        return (w.stats * 3 * c.stats + w.ovr * c.ovr + w.pot * c.pot) / (w.stats + w.ovr + w.pot);
     }
 
     return {

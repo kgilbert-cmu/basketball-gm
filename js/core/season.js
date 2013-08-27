@@ -219,19 +219,19 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
      * This makes an NBA-like schedule in terms of conference matchups, division matchups, and home/away games.
      * 
      * @memberOf core.season
-     * @return {Array.<Array.<number>>} All the season's games. Each element in the array is an array of the home team ID and the away team ID, respectively.
+     * @return {Array.<Array.<number>>} cb Callback function. Argument is all the season's games. Each element in the array is an array of the home team ID and the away team ID, respectively.
      */
     function newSchedule() {
-        var cid, days, dids, game, games, good, i, ii, iters, j, jj, jMax, k, matchup, matchups, n, newMatchup, t, team, teams, teamsAll, tids, tidsByConf, tidsInDays, tryNum, used;
+        var cid, days, dids, game, games, good, i, ii, iters, j, jj, jMax, k, matchup, matchups, n, newMatchup, t, teams, tids, tidsByConf, tidsInDays, tryNum, used;
 
-        teamsAll = helpers.getTeams();
-        teams = [];
+        teams = helpers.getTeamsDefault(); // Only tid, cid, and did are used, so this is okay for now. But if someone customizes cid and did, this will break. To fix that, make this function require DB access (and then fix the tests). Or even better, just accept "teams" as a param to this function, then the tests can use default values and the real one can use values from the DB.
+
         tids = [];  // tid_home, tid_away
 
         // Collect info needed for scheduling
-        for (i = 0; i < teamsAll.length; i++) {
-            team = teamsAll[i];
-            teams.push({tid: team.tid, cid: team.cid, did: team.did, homeGames: 0, awayGames: 0});
+        for (i = 0; i < teams.length; i++) {
+            teams[i].homeGames = 0;
+            teams[i].awayGames = 0;
         }
         for (i = 0; i < teams.length; i++) {
             for (j = 0; j < teams.length; j++) {
@@ -396,7 +396,9 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
                 scheduleStore.add(schedule[i]);
             }
         };
-        tx.oncomplete = cb;
+        tx.oncomplete = function () {
+            cb();
+        };
     }
 
     /**
@@ -586,7 +588,7 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
             if (!userTeamSizeError) {
                 updateOwnerMood(function (deltas) {
                     message.generate(deltas, function () {
-                        var tid, tids;
+                        var tids;
 
                         tids = newSchedule();
                         setSchedule(tids, function () {
@@ -875,11 +877,10 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
     }
 
     function newPhaseAfterDraft(cb) {
-        var draftPickStore, phaseText, round, t, teams, tx;
+        var draftPickStore, phaseText, round, t, tx;
 
         phaseText = g.season + " after draft";
 
-        teams = helpers.getTeams();
 
         // Add a new set of draft picks
         tx = g.dbl.transaction("draftPicks", "readwrite");
@@ -888,9 +889,9 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/draft", "core/f
             for (round = 1; round <= 2; round++) {
                 draftPickStore.add({
                     tid: t,
-                    abbrev: teams[t].abbrev,
+                    abbrev: g.teamAbbrevsCache[t],
                     originalTid: t,
-                    originalAbbrev: teams[t].abbrev,
+                    originalAbbrev: g.teamAbbrevsCache[t],
                     round: round,
                     season: g.season + 4
                 });

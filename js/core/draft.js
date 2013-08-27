@@ -133,7 +133,7 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
             }
 
             g.dbl.transaction("draftPicks").objectStore("draftPicks").index("season").getAll(g.season).onsuccess = function (event) {
-                var draftPickStore, draftOrder, draftPicks, draftPicksIndexed, i, teamsUnsorted, tid;
+                var draftPickStore, draftPicks, draftOrder, draftPicksIndexed, i, tid;
 
                 draftPicks = event.target.result;
                 // Reorganize this to an array indexed on originalTid and round
@@ -149,8 +149,6 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
                     };
                 }
 
-                teamsUnsorted = helpers.getTeams();
-
                 draftOrder = [];
                 // First round - lottery winners
                 for (i = 0; i < firstThree.length; i++) {
@@ -159,7 +157,7 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
                         round: 1,
                         pick: i + 1,
                         tid: tid,
-                        abbrev: teamsUnsorted[tid].abbrev,
+                        abbrev: g.teamAbbrevsCache[tid],
                         originalTid: teams[firstThree[i]].tid,
                         originalAbbrev: teams[firstThree[i]].abbrev
                     });
@@ -174,7 +172,7 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
                             round: 1,
                             pick: pick,
                             tid: tid,
-                            abbrev: teamsUnsorted[tid].abbrev,
+                            abbrev: g.teamAbbrevsCache[tid],
                             originalTid: teams[i].tid,
                             originalAbbrev: teams[i].abbrev
                         });
@@ -192,14 +190,14 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
                         round: 2,
                         pick: i + 1,
                         tid: tid,
-                        abbrev: teamsUnsorted[tid].abbrev,
+                        abbrev: g.teamAbbrevsCache[tid],
                         originalTid: teams[i].tid,
                         originalAbbrev: teams[i].abbrev
                     });
                 }
 
                 // Delete from draftPicks object store so that they are completely untradeable
-                draftPickStore = g.dbl.transaction("draftPicks", "readwrite").objectStore("draftPicks")
+                draftPickStore = g.dbl.transaction("draftPicks", "readwrite").objectStore("draftPicks");
                 for (i = 0; i < draftPicks.length; i++) {
                     draftPickStore.delete(draftPicks[i].dpid);
                 }
@@ -231,25 +229,24 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
 
         tx = g.dbl.transaction("players", "readwrite");
         tx.objectStore("players").openCursor(pid).onsuccess = function (event) {
-            var cursor, i, p, rookieSalaries, teams, years;
+            var cursor, i, p, rookieSalaries, years;
 
             cursor = event.target.result;
             p = cursor.value;
 
             // Draft player
             p.tid = pick.tid;
-            teams = helpers.getTeams();
             p.draft = {
                 round: pick.round,
                 pick: pick.pick,
                 tid: pick.tid,
                 year: g.season,
-                abbrev: teams[pick.tid].abbrev,
+                abbrev: g.teamAbbrevsCache[pick.tid],
                 originalTid: pick.originalTid,
                 originalAbbrev: pick.originalAbbrev,
                 // draftTeamName and draftTeamRegion are currently not used, but they don't do much harm
-                teamName: teams[pick.tid].name,
-                teamRegion: teams[pick.tid].region,
+                teamName: g.teamNamesCache[pick.tid],
+                teamRegion: g.teamRegionsCache[pick.tid],
                 pot: p.ratings[0].pot,
                 ovr: p.ratings[0].ovr,
                 skills: p.ratings[0].skills
@@ -291,7 +288,7 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
             var playersAll;
 
             playersAll = event.target.result;
-            playersAll.sort(function (a, b) {  return (b.ratings[0].ovr + 2 * b.ratings[0].pot) - (a.ratings[0].ovr + 2 * a.ratings[0].pot); });
+            playersAll.sort(function (a, b) { return player.value(b) - player.value(a); });
 
             getOrder(function (draftOrder) {
                 var autoSelectPlayer, cbAfterDoneAuto, pick, pid, selection;
@@ -317,8 +314,6 @@ define(["db", "globals", "core/finances", "core/player", "core/season", "core/te
 
                 // This will actually draft "untilUserOrEnd"
                 autoSelectPlayer = function () {
-                    var cb;
-
                     if (draftOrder.length > 0) {
                         pick = draftOrder.shift();
                         if (pick.tid === g.userTid) {

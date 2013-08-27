@@ -141,7 +141,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
         // Make sure game attributes (i.e. g.startingSeason) are loaded first
         loadGameAttributes(event.currentTarget.transaction, function () {
             if (event.oldVersion <= 1) {
-                teams = teams = helpers.getTeams();
+                teams = helpers.getTeamsDefault();
 
                 tx.objectStore("gameAttributes").put({
                     key: "ownerMood",
@@ -471,7 +471,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
                     draftPickStore.createIndex("season", "season", {unique: false});
                     draftPickStore.createIndex("tid", "tid", {unique: false});
 
-                    teams = helpers.getTeams();
+                    teams = helpers.getTeamsDefault();
 
                     if (g.phase >= g.PHASE.DRAFT) {
                         offset = 1;
@@ -656,7 +656,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
     function getPayroll(ot, tid, cb) {
         if (tid === undefined) {
             cb(0, []);
-            return console.log('ERROR: db.getPayroll needs a TID!')
+            return console.log('ERROR: db.getPayroll needs a TID!');
         }
         getContracts(ot, tid, function (contracts) {
             var i, payroll;

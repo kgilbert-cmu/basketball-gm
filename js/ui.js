@@ -190,8 +190,10 @@ define(["db", "globals", "templates", "lib/davis", "lib/jquery", "lib/knockout",
 
     // Data tables
     // fnStateSave and fnStateLoad are based on http://www.datatables.net/blog/localStorage_for_state_saving except the id of the table is used in the key. This means that whatever you do to a table (sorting, viewing page, etc) will apply to every identical table in other leagues.
-    function datatable(table, sort_col, data) {
-        table.dataTable({
+    function datatable(table, sort_col, data, extraOptions) {
+        var options;
+
+        options = $.extend({
             aaData: data,
             aaSorting: [[sort_col, "desc"]],
             bDestroy: true,
@@ -210,10 +212,14 @@ define(["db", "globals", "templates", "lib/davis", "lib/jquery", "lib/knockout",
                 sInfoEmpty: "Showing 0 to 0 of 0 players",
                 sInfoFiltered: "(filtered from _MAX_ total players)"
             }
-        });
+        }, extraOptions);
+
+        table.dataTable(options);
     }
-    function datatableSinglePage(table, sort_col, data) {
-        table.dataTable({
+    function datatableSinglePage(table, sort_col, data, extraOptions) {
+        var options;
+
+        options = $.extend({
             aaData: data,
             aaSorting: [[sort_col, "desc"]],
             bDestroy: true,
@@ -227,7 +233,9 @@ define(["db", "globals", "templates", "lib/davis", "lib/jquery", "lib/knockout",
             fnStateLoad: function (oSettings) {
                 return JSON.parse(localStorage.getItem("DataTables_" + table[0].id));
             }
-        });
+         }, extraOptions);
+	
+         table.dataTable(options);
     }
 
     // For dropdown menus to change team/season/whatever

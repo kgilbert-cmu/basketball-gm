@@ -10,7 +10,7 @@ define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], funct
 
         before(function (done) {
             db.connectMeta(function () {
-                league.create("Test", 0, undefined, 2013, function () {
+                league.create("Test", 0, undefined, undefined, 2013, function () {
                     done();
                 });
             });
@@ -64,7 +64,7 @@ define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], funct
                         }
                     }
 
-                    count.should.equal(12);
+                    count.should.equal(15);
 
                     done();
                 };

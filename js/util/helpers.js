@@ -122,15 +122,11 @@ define(["globals", "lib/jquery", "lib/knockout"], function (g, $, ko) {
     /**
      * Get list of teams, along with some metadata
      *
-     * Returns an array of 30 teams. Each array is an object with the following properties:
+     * Returns an array of 30 teams, sorted by tid. Each element contains an object with the following properties:
      *     tid: Integer team ID (0 to 29).
-     *     cid: Integer conference ID (0=East, 1=West).
-     *     did: Integer division ID.
      *     region: String region name.
      *     name: String team name.
      *     abbrev: String 3-letter team abbreviation.
-     *     pop: From http://www.forbes.com/nba-valuations/ number of people in the region, in millions of people.
-     *     popRank: Rank of population, 1=largest, 30=smallest.
      *     selected: If selectedTid is defined, this is a boolean representing whether this team is "selected" or not (see below).
      * 
      * @memberOf util.helpers
@@ -150,7 +146,47 @@ define(["globals", "lib/jquery", "lib/knockout"], function (g, $, ko) {
             }
         }
 
-        teams = [
+        teams = [];
+        for (i = 0; i < g.numTeams; i++) {
+            teams[i] = {
+                abbrev: g.teamAbbrevsCache[i],
+                region: g.teamRegionsCache[i],
+                name: g.teamNamesCache[i]
+            };
+        }
+
+        if (selectedTid >= 0) {
+            for (i = 0; i < teams.length; i++) {
+                teams[i].selected = false;
+            }
+            teams[selectedTid].selected = true;
+        }
+
+        return teams;
+    }
+
+    /**
+     * Get list of teams, along with some more metadata
+     *
+     * Returns an array of 30 teams. Each array is an object with the following properties:
+     *     tid: Integer team ID (0 to 29).
+     *     cid: Integer conference ID (0=East, 1=West).
+     *     did: Integer division ID.
+     *     region: String region name.
+     *     name: String team name.
+     *     abbrev: String 3-letter team abbreviation.
+     *     pop: From http://www.forbes.com/nba-valuations/ number of people in the region, in millions of people.
+     *     popRank: Rank of population, 1=largest, 30=smallest.
+     *     selected: If selectedTid is defined, this is a boolean representing whether this team is "selected" or not (see below).
+     *
+     * This should only be used to initialize things, since many of these values can change from their defaults.
+     * 
+     * @memberOf util.helpers
+     * @param {number|string} selectedTid A team ID or abbrev for a team that should be "selected" (as in, from a drop down menu). This will add the "selected" key to each team object, as described above.
+     * @return {Array.Object} All teams.
+     */
+    function getTeamsDefault() {
+        return [
             {tid: 0, cid: 0, did: 2, region: "Atlanta", name: "Herons", abbrev: "ATL", pop: 5.4, popRank: 12},
             {tid: 1, cid: 0, did: 0, region: "Boston", name: "Clovers", abbrev: "BOS", pop: 5.0, popRank: 13},
             {tid: 2, cid: 0, did: 0, region: "Brooklyn", name: "Nests", abbrev: "BK", pop: 19.1, popRank: 1},
@@ -182,15 +218,6 @@ define(["globals", "lib/jquery", "lib/knockout"], function (g, $, ko) {
             {tid: 28, cid: 1, did: 4, region: "Utah", name: "Jugglers", abbrev: "UTA", pop: 1.0, popRank: 30},
             {tid: 29, cid: 0, did: 2, region: "Washington", name: "Witches", abbrev: "WAS", pop: 5.7, popRank: 10}
         ];
-
-        if (selectedTid >= 0) {
-            for (i = 0; i < teams.length; i++) {
-                teams[i].selected = false;
-            }
-            teams[selectedTid].selected = true;
-        }
-
-        return teams;
     }
 
     /**
@@ -511,6 +538,7 @@ define(["globals", "lib/jquery", "lib/knockout"], function (g, $, ko) {
         validateSeason: validateSeason,
         getSeasons: getSeasons,
         getTeams: getTeams,
+        getTeamsDefault: getTeamsDefault,
         deepCopy: deepCopy,
         error: error,
         resetG: resetG,

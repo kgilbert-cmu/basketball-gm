@@ -27,17 +27,17 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
 
                         startingSeason = roster.startingSeason !== undefined ? roster.startingSeason : startingSeason;
 
-                        league.create(req.params.name, tid, roster.players, startingSeason, function (lid) {
+                        league.create(req.params.name, tid, roster.players, roster.teams, startingSeason, function (lid) {
                             ui.realtimeUpdate([], "/l/" + lid);
                         });
                     };
                 } else {
-                    league.create(req.params.name, tid, undefined, startingSeason, function (lid) {
+                    league.create(req.params.name, tid, undefined, undefined, startingSeason, function (lid) {
                         ui.realtimeUpdate([], "/l/" + lid);
                     });
                 }
             } else {
-                league.create(req.params.name, tid, undefined, startingSeason, function (lid) {
+                league.create(req.params.name, tid, undefined, undefined, startingSeason, function (lid) {
                     ui.realtimeUpdate([], "/l/" + lid);
                 });
             }
@@ -59,7 +59,7 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
                 newLid = 1;
             }
 
-            teams = helpers.getTeams();
+            teams = helpers.getTeamsDefault();
 
             deferred.resolve({
                 name: "League " + newLid,
@@ -75,7 +75,7 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
 
         ui.title("Create New League");
 
-        teams = helpers.getTeams();
+        teams = helpers.getTeamsDefault();
 
         updatePopText = function () {
             var difficulty, team;
@@ -117,7 +117,7 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
         updateShowUploadForm();
 
         $("#help-rosters").clickover({
-            title: "Rosters",
+            title: "Players",
             html: true,
             content: 'Rosters of the teams in your new league can either be filled by randomly-generated players or by players from a <a href="/manual/custom_rosters">custom roster file</a> you upload.'
         });

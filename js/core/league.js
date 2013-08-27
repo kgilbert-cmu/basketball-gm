@@ -2,7 +2,7 @@
  * @name core.league
  * @namespace Creating and removing leagues.
  */
-define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "core/team", "lib/faces", "lib/jquery", "util/helpers", "util/random"], function (db, g, ui, finances, player, season, team, faces, $, helpers, random) {
+define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "core/team", "lib/underscore", "util/helpers", "util/random"], function (db, g, ui, finances, player, season, team, _, helpers, random) {
     "use strict";
 
     /**
@@ -13,21 +13,36 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
      * @param {number} tid The team ID for the team the user wants to manage.
      * @param {Array.<Object>?} players Either an array of pre-generated player objects to use in the new league or undefined. If undefined, then random players will be generated.
      */
-    function create(name, tid, players, startingSeason, cb) {
+    function create(name, tid, players, teams, startingSeason, cb) {
         var l, leagueStore;
 
         l = {name: name, tid: tid, phaseText: ""};
         leagueStore = g.dbm.transaction("leagues", "readwrite").objectStore("leagues");
         leagueStore.add(l).onsuccess = function (event) {
-            var teams;
+            var i, prop, teamsDefault;
 
             g.lid = event.target.result;
 
-            teams = helpers.getTeams();
+            // Default teams
+            teamsDefault = helpers.getTeamsDefault();
+
+            // Any custom teams?
+            if (teams !== undefined) {
+                for (i = 0; i < teams.length; i++) {
+                    // Fill in default values as needed
+                    for (prop in teamsDefault[i]) {
+                        if (teamsDefault[i].hasOwnProperty(prop) && !teams[i].hasOwnProperty(prop)) {
+                            teams[i][prop] = teamsDefault[i][prop];
+                        }
+                    }
+                }
+            } else {
+                teams = teamsDefault;
+            }
 
             // Create new league database
             db.connectLeague(g.lid, function () {
-                var gameAttributes, key;
+                var gameAttributes;
 
                 gameAttributes = {
                     userTid: tid,
@@ -43,7 +58,10 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
                         playoffs: 0,
                         money: 0
                     },
-                    gameOver: false
+                    gameOver: false,
+                    teamAbbrevsCache: _.pluck(teams, "abbrev"),
+                    teamRegionsCache: _.pluck(teams, "region"),
+                    teamNamesCache: _.pluck(teams, "name")
                 };
 
                 // Clear old game attributes from g, to make sure the new ones are saved to the db in db.setGameAttributes
@@ -144,7 +162,7 @@ define(["db", "globals", "ui", "core/finances", "core/player", "core/season", "c
                                 pg = player.generate(p.tid, age, "", 0, 0, g.startingSeason - age, true, scoutingRank);
 
                                 // Optional things
-                                simpleDefaults = ["awards", "born", "college", "contract", "draft", "face", "freeAgentMood", "hgt", "injury", "pos", "ptModifier", "retiredYear", "rosterOrder", "weight", "yearsFreeAgent"];
+                                simpleDefaults = ["awards", "born", "college", "contract", "draft", "face", "freeAgentMood", "hgt", "imgURL", "injury", "pos", "ptModifier", "retiredYear", "rosterOrder", "weight", "yearsFreeAgent"];
                                 for (j = 0; j < simpleDefaults.length; j++) {
                                     if (!p.hasOwnProperty(simpleDefaults[j])) {
                                         p[simpleDefaults[j]] = pg[simpleDefaults[j]];

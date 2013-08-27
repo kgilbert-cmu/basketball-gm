@@ -239,6 +239,7 @@ define(["globals", "ui", "core/player", "core/trade", "lib/davis", "lib/jquery",
                                     updateSummary(vars, function (vars) {
                                         if (vm.teams.length === 0) {
                                             teams = helpers.getTeams(otherTid);
+
                                             vars.userTeamName = teams[g.userTid].region + " " + teams[g.userTid].name;
                                             teams.splice(g.userTid, 1);  // Can't trade with yourself
                                             vars.teams = teams;
@@ -352,11 +353,13 @@ define(["globals", "ui", "core/player", "core/trade", "lib/davis", "lib/jquery",
         };
 
         ko.computed(function () {
-            ui.datatableSinglePage($("#roster-user"), 5, tradeable("user", vm.userRoster()));
+            ui.datatableSinglePage($("#roster-user"), 5, tradeable("user", vm.userRoster()),
+                                   {aoColumnDefs: [{bSortable: false, aTargets: [0]}]});
         }).extend({throttle: 1});
 
         ko.computed(function () {
-            ui.datatableSinglePage($("#roster-other"), 5, tradeable("other", vm.otherRoster()));
+            ui.datatableSinglePage($("#roster-other"), 5, tradeable("other", vm.otherRoster()),
+                                   {aoColumnDefs: [{bSortable: false, aTargets: [0]}]});
         }).extend({throttle: 1});
     }
 

@@ -45,7 +45,7 @@ define(["globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/under
                     cursor.continue();
                 } else {
                     players = player.filter(playersAll, {
-                        attrs: ["pid", "name", "pos", "draft", "retiredYear"],
+                        attrs: ["pid", "name", "pos", "draft", "retiredYear", "statsTids"],
                         ratings: ["ovr"],
                         stats: ["season", "abbrev", "gp", "min", "trb", "ast", "pts", "per"]
                     });
@@ -85,8 +85,15 @@ define(["globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/under
 
         ko.computed(function () {
             ui.datatable($("#hall-of-fame"), 2, _.map(vm.players(), function (p) {
-                return ['<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>', p.pos, String(p.draft.year), String(p.retiredYear), String(p.peakOvr), String(p.bestStats.season),  '<a href="' + helpers.leagueUrl(["roster", p.bestStats.abbrev, p.bestStats.season]) + '">' + p.bestStats.abbrev + '</a>', String(p.bestStats.gp), helpers.round(p.bestStats.min, 1), helpers.round(p.bestStats.pts, 1), helpers.round(p.bestStats.trb, 1), helpers.round(p.bestStats.ast, 1), helpers.round(p.bestStats.per, 1), String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1)];
-            }));
+                return ['<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>', p.pos, String(p.draft.year), String(p.retiredYear), String(p.peakOvr), String(p.bestStats.season),  '<a href="' + helpers.leagueUrl(["roster", p.bestStats.abbrev, p.bestStats.season]) + '">' + p.bestStats.abbrev + '</a>', String(p.bestStats.gp), helpers.round(p.bestStats.min, 1), helpers.round(p.bestStats.pts, 1), helpers.round(p.bestStats.trb, 1), helpers.round(p.bestStats.ast, 1), helpers.round(p.bestStats.per, 1), String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1), p.statsTids.indexOf(g.userTid) >= 0];
+            }), {
+                fnRowCallback: function (nRow, aData) {
+                    // Highlight players from the user's team
+                    if (aData[aData.length - 1]) {
+                        nRow.classList.add("alert-info");
+                    }
+                }
+            });
         }).extend({throttle: 1});
     }
 

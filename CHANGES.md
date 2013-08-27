@@ -1,12 +1,21 @@
 This is a list of **only the major changes** in each version.
 
+# Since 3.1.1
+
+## Gameplay and UI
+
+- AI teams will not trade away more than two draft picks in a single trade
+- Fewer high-rated big men are generated
+- Support for customized team names
+- Support for player images in custom rosters
+
 # 3.1.1 (2013-07-26)
 
 ## Technical details
 
 - Just a bunch of minor bug fixes
 
-# 3.1.0 (2013-06-17)
+# 3.1.0 (2013-07-17)
 
 ## Gameplay and UI
 
