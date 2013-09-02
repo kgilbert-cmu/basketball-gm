@@ -31,7 +31,11 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
      * @return {number} Overall rating.
      */
     function ovr(ratings) {
-        return Math.round((ratings.hgt + ratings.stre + ratings.spd + ratings.jmp + ratings.endu + ratings.ins + ratings.dnk + ratings.ft + ratings.fg + ratings.tp + ratings.blk + ratings.stl + ratings.drb + ratings.pss + ratings.reb) / 15);
+        ///return Math.round((ratings.hgt + ratings.stre + ratings.spd + ratings.jmp + ratings.endu + ratings.ins + ratings.dnk + ratings.ft + ratings.fg + ratings.tp + ratings.blk + ratings.stl + ratings.drb + ratings.pss + ratings.reb) / 15);
+
+        // This formula is loosely based on linear regression:
+        //     player = require('core/player'); player.regressRatingsPer();
+        return Math.round((4 * ratings.hgt + ratings.stre + 4 * ratings.spd + 2 * ratings.jmp + 3 * ratings.endu + 3 * ratings.ins + 4 * ratings.dnk + ratings.ft + ratings.fg + 2 * ratings.tp + ratings.blk + ratings.stl + ratings.drb + 3 * ratings.pss + ratings.reb) / 32);
     }
 
     /**
@@ -445,15 +449,19 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
      * @memberOf core.player
      * @param {IDBTransaction} transaction An IndexedDB transaction on players, releasedPlayers, and teams, readwrite.
      * @param {Object} p Player object.
+     * @param {boolean} justDrafted True if the player was just drafted by his current team and the regular season hasn't started yet. False otherwise. If True, then the player can be released without paying his salary.
      * @param {function()} cb Callback function.
      */
-    function release(transaction, p, cb) {
-        // Keep track of player salary even when he's off the team
-        transaction.objectStore("releasedPlayers").add({
-            pid: p.pid,
-            tid: p.tid,
-            contract: p.contract
-        });
+    function release(transaction, p, justDrafted, cb) {
+        // Keep track of player salary even when he's off the team, but make an exception for players who were just drafted
+        // Was the player just drafted?
+        if (!justDrafted) {
+            transaction.objectStore("releasedPlayers").add({
+                pid: p.pid,
+                tid: p.tid,
+                contract: p.contract
+            });
+        }
 
         genBaseMoods(transaction, function (baseMoods) {
             addToFreeAgents(transaction, p, g.phase, baseMoods, cb);
@@ -498,11 +506,11 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
     function genRatings(profile, baseRating, pot, season, scoutingRank) {
         var i, key, profileId, profiles, ratingKeys, ratings, rawRating, rawRatings, sigmas;
 
-        if (profile === 'Point') {
+        if (profile === "Point") {
             profileId = 1;
-        } else if (profile === 'Wing') {
+        } else if (profile === "Wing") {
             profileId = 2;
-        } else if (profile === 'Big') {
+        } else if (profile === "Big") {
             profileId = 3;
         } else {
             profileId = 0;
@@ -523,7 +531,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         }
 
         ratings = {};
-        ratingKeys = ['hgt', 'stre', 'spd', 'jmp', 'endu', 'ins', 'dnk', 'ft', 'fg', 'tp', 'blk', 'stl', 'drb', 'pss', 'reb'];
+        ratingKeys = ["hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb"];
         for (i = 0; i < ratingKeys.length; i++) {
             key = ratingKeys[i];
             ratings[key] = rawRatings[i];
@@ -1342,7 +1350,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         potential = pr.pot;
 
         // If performance is already exceeding predicted potential, just use that
-        if (current >= potential && age < 31) {
+        if (current >= potential && age < 29) {
             return current;
         }
 
@@ -1369,21 +1377,218 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         if (age === 25) {
             return 0.05 * potential + 0.95 * current;
         }
-        if (age > 25 && age < 31) {
+        if (age > 25 && age < 29) {
             return current;
         }
-        if (age === 31) {
+        if (age === 29) {
             return 0.975 * current;
         }
-        if (age === 32) {
+        if (age === 30) {
             return 0.95 * current;
         }
-        if (age === 33) {
-            return 0.925 * current;
-        }
-        if (age > 33) {
+        if (age === 31) {
             return 0.9 * current;
         }
+        if (age === 32) {
+            return 0.85 * current;
+        }
+        if (age === 33) {
+            return 0.8 * current;
+        }
+        if (age > 33) {
+            return 0.7 * current;
+        }
+    }
+
+    function regressRatingsPer() {
+        // http://rosettacode.org/wiki/Multiple_regression#JavaScript
+        function Matrix(ary) {
+            this.mtx = ary;
+            this.height = ary.length;
+            this.width = ary[0].length;
+        }
+
+        Matrix.prototype.toString = function () {
+            var i, s;
+
+            s = [];
+            for (i = 0; i < this.mtx.length; i++) {
+                s.push(this.mtx[i].join(","));
+            }
+            return s.join("\n");
+        };
+
+        // returns a new matrix
+        Matrix.prototype.transpose = function () {
+            var i, j, transposed;
+
+            transposed = [];
+            for (i = 0; i < this.width; i++) {
+                transposed[i] = [];
+                for (j = 0; j < this.height; j++) {
+                    transposed[i][j] = this.mtx[j][i];
+                }
+            }
+            return new Matrix(transposed);
+        };
+
+        // returns a new matrix
+        Matrix.prototype.mult = function (other) {
+            var i, j, k, result, sum;
+
+            if (this.width !== other.height) {
+                throw "error: incompatible sizes";
+            }
+
+            result = [];
+            for (i = 0; i < this.height; i++) {
+                result[i] = [];
+                for (j = 0; j < other.width; j++) {
+                    sum = 0;
+                    for (k = 0; k < this.width; k++) {
+                        sum += this.mtx[i][k] * other.mtx[k][j];
+                    }
+                    result[i][j] = sum;
+                }
+            }
+            return new Matrix(result);
+        };
+
+        // modifies the matrix in-place
+        Matrix.prototype.toReducedRowEchelonForm = function () {
+            var i, j, lead, r, tmp, val;
+
+            lead = 0;
+            for (r = 0; r < this.height; r++) {
+                if (this.width <= lead) {
+                    return;
+                }
+                i = r;
+                while (this.mtx[i][lead] === 0) {
+                    i++;
+                    if (this.height === i) {
+                        i = r;
+                        lead++;
+                        if (this.width === lead) {
+                            return;
+                        }
+                    }
+                }
+
+                tmp = this.mtx[i];
+                this.mtx[i] = this.mtx[r];
+                this.mtx[r] = tmp;
+
+                val = this.mtx[r][lead];
+                for (j = 0; j < this.width; j++) {
+                    this.mtx[r][j] /= val;
+                }
+
+                for (i = 0; i < this.height; i++) {
+                    if (i !== r) {
+                        val = this.mtx[i][lead];
+                        for (j = 0; j < this.width; j++) {
+                            this.mtx[i][j] -= val * this.mtx[r][j];
+                        }
+                    }
+                }
+                lead++;
+            }
+            return this;
+        };
+
+        function IdentityMatrix(n) {
+            var i, j;
+
+            this.height = n;
+            this.width = n;
+            this.mtx = [];
+            for (i = 0; i < n; i++) {
+                this.mtx[i] = [];
+                for (j = 0; j < n; j++) {
+                    this.mtx[i][j] = (i === j ? 1 : 0);
+                }
+            }
+        }
+        IdentityMatrix.prototype = Matrix.prototype;
+
+        // modifies the matrix "in place"
+        Matrix.prototype.inverse = function () {
+            var i, I;
+
+            if (this.height !== this.width) {
+                throw "can't invert a non-square matrix";
+            }
+
+            I = new IdentityMatrix(this.height);
+            for (i = 0; i < this.height; i++) {
+                this.mtx[i] = this.mtx[i].concat(I.mtx[i]);
+            }
+            this.width *= 2;
+
+            this.toReducedRowEchelonForm();
+
+            for (i = 0; i < this.height; i++) {
+                this.mtx[i].splice(0, this.height);
+            }
+            this.width /= 2;
+
+            return this;
+        };
+
+        function ColumnVector(ary) {
+            return new Matrix(ary.map(function (v) { return [v]; }));
+        }
+        ColumnVector.prototype = Matrix.prototype;
+
+        Matrix.prototype.regression_coefficients = function (x) {
+            var x_t;
+
+            x_t = x.transpose();
+
+            return x_t.mult(x).inverse().mult(x_t).mult(this);
+        }
+
+        g.dbl.transaction("players").objectStore("players").getAll().onsuccess = function (event) {
+            var c, i, j, k, p, pers, players, ratings, ratingLabels, x, y;
+
+            pers = [];
+            ratings = [];
+
+            players = player.filter(event.target.result, {
+                ratings: ["season", "hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb"],
+                stats: ["season", "per", "min"],
+                totals: true
+            });
+
+            for (i = 0; i < players.length; i++) {
+                p = players[i];
+
+                // Loop through seasons
+                for (j = 0; j < p.ratings.length; j++) {
+                    // Find stats entry to match ratings
+                    for (k = 0; k < p.stats.length; k++) {
+                        if (p.ratings[j].season === p.stats[k].season && !p.stats[k].playoffs) {
+                            // Ignore anything under 500 minutes
+                            if (p.stats[k].min > 500) {
+                                pers.push(p.stats[k].per);
+                                ratings.push([p.ratings[j].hgt, p.ratings[j].stre, p.ratings[j].spd, p.ratings[j].jmp, p.ratings[j].endu, p.ratings[j].ins, p.ratings[j].dnk, p.ratings[j].ft, p.ratings[j].fg, p.ratings[j].tp, p.ratings[j].blk, p.ratings[j].stl, p.ratings[j].drb, p.ratings[j].pss, p.ratings[j].reb]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            x = new Matrix(ratings);
+            y = new ColumnVector(pers);
+
+            c = y.regression_coefficients(x);
+
+            ratingLabels = ["hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb"];
+            for (i = 0; i < ratingLabels.length; i++) {
+                console.log(ratingLabels[i] + ": " + c.mtx[i][0] * 100);
+            }
+        };
     }
 
     return {
@@ -1402,6 +1607,7 @@ define(["globals", "core/finances", "data/injuries", "data/names", "lib/faces", 
         skills: skills,
         filter: filter,
         madeHof: madeHof,
-        value: value
+        value: value,
+        regressRatingsPer: regressRatingsPer
     };
 });

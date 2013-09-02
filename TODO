@@ -48,6 +48,7 @@ BIG NEW GAMEPLAY CHANGES
 ------------------------
 
 remove "buy out"
+  done, but the backend code is still there
 less weird player rating combos
   different ratings should have different potential for growth - easier to improve jumpshot than quickness
   revamp position assignment algorithm
@@ -76,6 +77,14 @@ player development
 MINOR FIXES
 -----------
 
+player.value
+  player value shouldn't rely only on raw stats, because teammates heavily influence stats
+    add some fudge factor to discout PER on good teams and inflate it on bad teams
+  too easy to trade for young prospects with no stats http://www.reddit.com/r/BasketballGM/comments/1lkv5m/utah_jugglers/
+    options:
+      1. add fudge factor to make teams less willing to trade away young players without much game experience
+      2. just increase the value for ovr in player.value (try this now)
+        is there a better function than 4 * PER to map between PER and ovr? plot.
 AI teams playing with under 5 players http://www.reddit.com/r/BasketballGM/comments/1l3od6/glitch_just_had_a_cpu_team_play_a_whole_season_w/
   AI teams should never drop below 5 in regular season http://www.reddit.com/r/BasketballGM/comments/1l3od6/glitch_just_had_a_cpu_team_play_a_whole_season_w/cbvzngs
     no min roster limit in trades?
@@ -95,27 +104,39 @@ show annual ratings changes in roster page
     when viewing a url like /l/1/roster, playing until new season shouldn't move it to roster for previous year
       this happens because inputs.season gets set even though it's not present in the URL. elegant solution?
 add function to delete old box scores (older than, say 5 years) to debug menu, to save space
-team names from db
-  g.teamNamesCache and g.teamRegionsCache and g.teamAbbrevsCache - update this when appropriate
-  store region and name in meta so it can be shown on dashboard
-    update this when changed on customize screen
-  "customize" screen
-    option to load from JSON file
-  export rosters should include teams
-    option to include just team names or just players
-  when is popRank updated? make sure to do it on new league start.
-    can i get rid of hardcoded popRank?
 make trade counter-offer faster by checking if no trade is possible first http://www.reddit.com/r/BasketballGM/comments/1jumc9/is_it_just_me_or_does_it_take_wayyyy_too_long_for/
-better ovr formula
-  regression, see what is important?
 document things that affect player mood
 contracts should take ratings into more account, since stats on a good team are inflated and stats on a bad team are depressed
 show four factors somewhere
 show attendance in box score
+security
+  validate any user-added content, like custom team names (both in file and through form), custom players, and league names
+in playoffs, replace "play week" with "play until end of round"
+"Watch list" of players the user is interested in
 
 LOW PRIORITY
 ------------
 
+jslint errors
+  currently just "Don't make functions within a loop." which should all be fixed eventually
+  can I get rid of all the "is OK" lines?
+  jshint?
+A year-to-date comparison of team finances with the previous year.
+better core.player.ovr formula
+  regression: player = require('core/player'); player.regressRatingsPer();
+    weight by minutes played
+  THIS NEEDS TO BE UPDATED WHEN PLAYER GENERATION/DEVELOPMENT OR GAMESIM CHANGES!
+team names from db
+  g.teamNamesCache and g.teamRegionsCache and g.teamAbbrevsCache - update this when appropriate
+  store region and name in meta so it can be shown on dashboard
+    update this when changed on customize screen
+  option to load from JSON file on "Edit Team Info"
+  export rosters should include teams
+    option to include just team names or just players
+    should update popRank when custom teams are supplied
+  not so simple to allow abbrevs to be changed, since they are used elsewhere for convenience - damn indexeddb and denormalization!
+  make edit_team_info prettier
+popRank never updates, but I don't think it matters.
 different owner personalities, with different priorities
 trades
   "undo" button for accidental trades
@@ -357,8 +378,6 @@ IE10 support
     hacky solution used now (see js/lib/README.md) but maybe this will lead to a real answer: http://stackoverflow.com/q/17641380/786644
   http://www.reddit.com/r/BasketballGM/comments/1kj8nv/i_have_updated_firefox_but_the_game_wont_load_in/
 hire/fire different coaches with different strategies
-jslint errors
-  currently just "Don't make functions within a loop." which should all be fixed eventually
 Web workers
   don't seem to actually help performance. maybe help responsiveness
   benchmark?
