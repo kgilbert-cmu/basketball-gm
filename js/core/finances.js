@@ -35,7 +35,15 @@ define(["globals", "lib/underscore"], function (g, _) {
                         team.seasons[i].expenses.minTax.amount = g.minPayroll - payrolls[team.tid];
                         team.seasons[i].cash -= team.seasons[i].expenses.minTax.amount;
                     } else if (payrolls[team.tid] > g.luxuryPayroll) {
-                        team.seasons[i].expenses.luxuryTax.amount = g.luxuryTax * (payrolls[team.tid] - g.luxuryPayroll);
+                        var diff, j;
+                        diff = payrolls[team.tid] - g.luxuryPayroll;
+                        j = 0;
+                        do {
+                            diff -= 5000;
+                            team.seasons[i].expenses.luxuryTax.amount += (g.luxuryTax + 0.125 * j + .125 * j^2) * 5000;
+                            j += 1;
+                        } while (diff >= 5000);
+                        team.seasons[i].expenses.luxuryTax.amount += (g.luxuryTax + 0.125 * j + .125 * j^2) * diff;
                         team.seasons[i].cash -= team.seasons[i].expenses.luxuryTax.amount;
                     }
 
