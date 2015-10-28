@@ -2,7 +2,7 @@
  * @name views.playerRatingDists
  * @namespace Player rating distributions.
  */
-define(["globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib/knockout", "lib/underscore", "views/components", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, player, boxPlot, $, ko, _, components, bbgmView, helpers, viewHelpers) {
+define(["dao", "globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib/knockout", "lib/underscore", "views/components", "util/bbgmView", "util/helpers"], function (dao, g, ui, player, boxPlot, $, ko, _, components, bbgmView, helpers) {
     "use strict";
 
     function get(req) {
@@ -16,15 +16,13 @@ define(["globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib/knocko
     }
 
     function updatePlayers(inputs, updateEvents, vm) {
-        var deferred;
-
         if (updateEvents.indexOf("dbChange") >= 0 || (inputs.season === g.season && (updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0)) || inputs.season !== vm.season()) {
-            deferred = $.Deferred();
+            return dao.players.getAll({
+                statsSeasons: [inputs.season]
+            }).then(function (players) {
+                var ratingsAll;
 
-            g.dbl.transaction("players").objectStore("players").getAll().onsuccess = function (event) {
-                var data, players, ratingsAll;
-
-                players = player.filter(event.target.result, {
+                players = player.filter(players, {
                     ratings: ["ovr", "pot", "hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb"],
                     season: inputs.season,
                     showNoStats: true,
@@ -46,12 +44,11 @@ define(["globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib/knocko
                     return memo;
                 }, {});
 
-                deferred.resolve({
+                return {
                     season: inputs.season,
                     ratingsAll: ratingsAll
-                });
-            };
-            return deferred.promise();
+                };
+            });
         }
     }
 

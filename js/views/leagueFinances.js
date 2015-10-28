@@ -26,27 +26,21 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
     };
 
     function updateLeagueFinances(inputs, updateEvents, vm) {
-        var deferred;
-
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || inputs.season !== vm.season() || inputs.season === g.season) {
-            deferred = $.Deferred();
-
-            team.filter({
+            return team.filter({
                 attrs: ["tid", "abbrev", "region", "name"],
                 seasonAttrs: ["att", "revenue", "profit", "cash", "payroll", "salaryPaid"],
                 season: inputs.season
-            }, function (teams) {
-                deferred.resolve({
+            }).then(function (teams) {
+                return {
                     season: inputs.season,
                     salaryCap: g.salaryCap / 1000,
                     minPayroll: g.minPayroll / 1000,
                     luxuryPayroll: g.luxuryPayroll / 1000,
                     luxuryTax: g.luxuryTax,
                     teams: teams
-                });
+                };
             });
-
-            return deferred.promise();
         }
     }
 
@@ -64,6 +58,8 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
                 return ['<a href="' + helpers.leagueUrl(["team_finances", t.abbrev]) + '">' + t.region + ' ' + t.name + '</a>', helpers.numberWithCommas(helpers.round(t.att)), helpers.formatCurrency(t.revenue, "M"), helpers.formatCurrency(t.profit, "M"), helpers.formatCurrency(t.cash, "M"), helpers.formatCurrency(payroll, "M")];
             }));
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($("#league-finances"));
     }
 
     function uiEvery(updateEvents, vm) {

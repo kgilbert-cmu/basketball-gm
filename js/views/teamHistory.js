@@ -2,7 +2,7 @@
  * @name views.teamHistory
  * @namespace Team history.
  */
-define(["db", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "util/viewHelpers", "views/components"], function (db, g, ui, player, $, ko, _, bbgmView, helpers, viewHelpers, components) {
+define(["dao", "globals", "ui", "core/player", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "views/components"], function (dao, g, ui, player, Promise, $, ko, _, bbgmView, helpers, components) {
     "use strict";
 
     var mapping;
@@ -34,17 +34,23 @@ define(["db", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib
     };
 
     function updateTeamHistory(inputs, updateEvents, vm) {
-        var deferred;
-
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || inputs.abbrev !== vm.abbrev()) {
-            deferred = $.Deferred();
-
-            g.dbl.transaction("teams").objectStore("teams").get(inputs.tid).onsuccess = function (event) {
-                var abbrev, history, i, userTeam, userTeamSeason;
-
-                userTeam = event.target.result;
+            return Promise.all([
+                dao.teams.get({key: inputs.tid}),
+                dao.players.getAll({
+                    index: "statsTids",
+                    key: inputs.tid,
+                    statsSeasons: "all",
+                    statsTid: inputs.tid
+                })
+            ]).spread(function (userTeam, players) {
+                var championships, history, i, j, playoffAppearances, totalLost, totalWon;
 
                 history = [];
+                totalWon = 0;
+                totalLost = 0;
+                playoffAppearances = 0;
+                championships = 0;
                 for (i = 0; i < userTeam.seasons.length; i++) {
                     history.push({
                         season: userTeam.seasons[i].season,
@@ -52,32 +58,55 @@ define(["db", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib
                         lost: userTeam.seasons[i].lost,
                         playoffRoundsWon: userTeam.seasons[i].playoffRoundsWon
                     });
+                    totalWon += userTeam.seasons[i].won;
+                    totalLost += userTeam.seasons[i].lost;
+                    if (userTeam.seasons[i].playoffRoundsWon >= 0) {
+                        playoffAppearances += 1;
+                    }
+                    if (userTeam.seasons[i].playoffRoundsWon === 4) {
+                        championships += 1;
+                    }
                 }
                 history.reverse(); // Show most recent season first
 
-                g.dbl.transaction("players").objectStore("players").index("statsTids").getAll(inputs.tid).onsuccess = function (event) {
-                    var i, players;
+                players = player.filter(players, {
+                    attrs: ["pid", "name", "injury", "tid", "hof", "watch"],
+                    ratings: ["pos"],
+                    stats: ["season", "abbrev", "gp", "min", "pts", "trb", "ast", "per", "ewa"],
+                    tid: inputs.tid
+                });
 
-                    players = player.filter(event.target.result, {
-                        attrs: ["pid", "name", "pos", "injury"],
-                        stats: ["gp", "min", "pts", "trb", "ast", "per"],
-                        tid: inputs.tid
-                    });
+                for (i = 0; i < players.length; i++) {
+                    players[i].stats.reverse();
 
-                    for (i = 0; i < players.length; i++) {
-                        delete players[i].ratings;
-                        delete players[i].stats;
+                    for (j = 0; j < players[i].stats.length; j++) {
+                        if (players[i].stats[j].abbrev === userTeam.abbrev) {
+                            players[i].lastYr = players[i].stats[j].season + ' ';
+                            break;
+                        }
                     }
 
-                    deferred.resolve({
-                        abbrev: inputs.abbrev,
-                        history: history,
-                        players: players
-                    });
-                };
-            };
+                    players[i].pos = players[i].ratings[players[i].ratings.length - 1].pos;
 
-            return deferred.promise();
+                    delete players[i].ratings;
+                    delete players[i].stats;
+                }
+
+                return {
+                    abbrev: inputs.abbrev,
+                    history: history,
+                    players: players,
+                    team: {
+                        name: userTeam.name,
+                        region: userTeam.region,
+                        tid: inputs.tid
+                    },
+                    totalWon: totalWon,
+                    totalLost: totalLost,
+                    playoffAppearances: playoffAppearances,
+                    championships: championships
+                };
+            });
         }
     }
 
@@ -86,9 +115,22 @@ define(["db", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib
 
         ko.computed(function () {
             ui.datatable($("#team-history-players"), 2, _.map(vm.players(), function (p) {
-                return [helpers.playerNameLabels(p.pid, p.name, p.injury, []), p.pos, String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1)];
-            }));
+                return [helpers.playerNameLabels(p.pid, p.name, p.injury, [], p.watch), p.pos, String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1), helpers.round(p.careerStats.ewa, 1), p.lastYr, p.hof, p.tid > g.PLAYER.RETIRED && p.tid !== vm.team.tid(), p.tid === vm.team.tid()];
+            }), {
+                rowCallback: function (row, data) {
+                    // Highlight active players
+                    if (data[data.length - 1]) {
+                        row.classList.add("success"); // On this team
+                    } else if (data[data.length - 2]) {
+                        row.classList.add("info"); // On other team
+                    } else if (data[data.length - 3]) {
+                        row.classList.add("danger"); // Hall of Fame
+                    }
+                }
+            });
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($("#team-history-players"));
     }
 
     function uiEvery(updateEvents, vm) {

@@ -2,7 +2,7 @@
  * @name views.history
  * @namespace Summaries of past seasons, leaguewide.
  */
-define(["globals", "ui", "core/player", "core/team", "lib/jquery", "lib/knockout", "util/bbgmView", "util/helpers", "util/viewHelpers", "views/components"], function (g, ui, player, team, $, ko, bbgmView, helpers, viewHelpers, components) {
+define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/knockout", "util/bbgmView", "util/helpers", "views/components"], function (dao, g, ui, player, team, Promise, ko, bbgmView, helpers, components) {
     "use strict";
 
     function get(req) {
@@ -30,51 +30,67 @@ define(["globals", "ui", "core/player", "core/team", "lib/jquery", "lib/knockout
     }
 
     function updateHistory(inputs, updateEvents, vm) {
-        var deferred;
-
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || vm.season() !== inputs.season) {
-            deferred = $.Deferred();
+            return Promise.all([
+                dao.awards.get({key: inputs.season}),
+                dao.players.getAll({
+                    index: "retiredYear",
+                    key: inputs.season,
+                    statsSeasons: [inputs.season]
+                }),
+                team.filter({
+                    attrs: ["tid", "abbrev", "region", "name"],
+                    seasonAttrs: ["playoffRoundsWon"],
+                    season: inputs.season
+                })
+            ]).spread(function (awards, retiredPlayers, teams) {
+                var champ, i;
 
-            g.dbl.transaction("awards").objectStore("awards").get(inputs.season).onsuccess = function (event) {
-                var awards;
+                // Hack placeholder for old seasons before Finals MVP existed
+                if (!awards.hasOwnProperty("finalsMvp")) {
+                    awards.finalsMvp = {
+                        pid: 0,
+                        name: "N/A",
+                        pts: 0,
+                        trb: 0,
+                        ast: 0
+                    };
+                }
 
-                awards = event.target.result;
+                // Hack placeholder for old seasons before Finals MVP existed
+                if (!awards.hasOwnProperty("allRookie")) {
+                    awards.allRookie = [];
+                }
 
-                g.dbl.transaction("players").objectStore("players").index("retiredYear").getAll(inputs.season).onsuccess = function (event) {
-                    var retiredPlayers;
+                // Get list of retired players
+                retiredPlayers = player.filter(retiredPlayers, {
+                    attrs: ["pid", "name", "age", "hof"],
+                    season: inputs.season,
+                    stats: ["tid", "abbrev"],
+                    showNoStats: true
+                });
+                for (i = 0; i < retiredPlayers.length; i++) {
+                    // Show age at retirement, not current age
+                    retiredPlayers[i].age -= g.season - inputs.season;
+                }
+                retiredPlayers.sort(function (a, b) { return b.age - a.age; });
 
-                    retiredPlayers = player.filter(event.target.result, {
-                        attrs: ["pid", "name", "age", "hof"],
-                        season: inputs.season,
-                        fuzz: true
-                    });
-                    retiredPlayers.sort(function (a, b) { return b.age - a.age; });
+                // Get champs
+                for (i = 0; i < teams.length; i++) {
+                    if (teams[i].playoffRoundsWon === 4) {
+                        champ = teams[i];
+                        break;
+                    }
+                }
 
-                    team.filter({
-                        attrs: ["abbrev", "region", "name"],
-                        seasonAttrs: ["playoffRoundsWon"],
-                        season: inputs.season
-                    }, function (teams) {
-                        var champ, i;
-
-                        for (i = 0; i < teams.length; i++) {
-                            if (teams[i].playoffRoundsWon === 4) {
-                                champ = teams[i];
-                                break;
-                            }
-                        }
-
-                        deferred.resolve({
-                            awards: awards,
-                            champ: champ,
-                            retiredPlayers: retiredPlayers,
-                            season: inputs.season
-                        });
-                    });
+                return {
+                    awards: awards,
+                    champ: champ,
+                    retiredPlayers: retiredPlayers,
+                    season: inputs.season,
+                    userTid: g.userTid
                 };
-            };
-
-            return deferred.promise();
+            });
         }
     }
 

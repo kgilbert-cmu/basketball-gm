@@ -2,49 +2,48 @@
  * @name test.core.league
  * @namespace Tests for core.league.
  */
-define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], function (db, g, league, _, testHelpers) {
+define(["dao", "db", "globals", "core/league", "lib/underscore", "test/helpers"], function (dao, db, g, league, _, testHelpers) {
     "use strict";
 
     describe("core/league", function () {
-        var testDraftUntilUserOrEnd, testDraftUser;
-
-        before(function (done) {
-            db.connectMeta(function () {
-                league.create("Test", 0, undefined, function () {
-                    done();
-                });
+        before(function () {
+            return db.connectMeta().then(function () {
+                return league.create("Test", 0, undefined, 2013, false);
             });
         });
+        // After not needed because last test removes DB
 
         describe("#create()", function () {
-            it("should add entry in meta leagues object store", function (done) {
-                g.dbm.transaction("leagues").objectStore("leagues").get(g.lid).onsuccess = function (event) {
-                    event.target.result.name.should.equal("Test");
-                    event.target.result.tid.should.equal(0);
-                    event.target.result.phaseText.should.equal(g.startingSeason + " regular season");
-                    done();
-                };
+            it("should add entry in meta leagues object store", function () {
+                return dao.leagues.get({key: g.lid}).then(function (l) {
+                    l.name.should.equal("Test");
+                    l.tid.should.equal(0);
+                    l.phaseText.should.equal(g.startingSeason + " regular season");
+                });
             });
             it("should create all necessary object stores", function () {
-                g.dbl.objectStoreNames.should.have.length(13);
+                g.dbl.objectStoreNames.should.have.length(16);
                 g.dbl.objectStoreNames.contains("awards").should.equal(true);
+                g.dbl.objectStoreNames.contains("events").should.equal(true);
                 g.dbl.objectStoreNames.contains("draftOrder").should.equal(true);
                 g.dbl.objectStoreNames.contains("gameAttributes").should.equal(true);
                 g.dbl.objectStoreNames.contains("games").should.equal(true);
                 g.dbl.objectStoreNames.contains("messages").should.equal(true);
                 g.dbl.objectStoreNames.contains("negotiations").should.equal(true);
                 g.dbl.objectStoreNames.contains("players").should.equal(true);
+                g.dbl.objectStoreNames.contains("playerFeats").should.equal(true);
+                g.dbl.objectStoreNames.contains("playerStats").should.equal(true);
                 g.dbl.objectStoreNames.contains("playoffSeries").should.equal(true);
                 g.dbl.objectStoreNames.contains("releasedPlayers").should.equal(true);
                 g.dbl.objectStoreNames.contains("schedule").should.equal(true);
                 g.dbl.objectStoreNames.contains("teams").should.equal(true);
                 g.dbl.objectStoreNames.contains("trade").should.equal(true);
             });
-            it("should initialize gameAttributes object store", function (done) {
-                g.dbl.transaction("gameAttributes").objectStore("gameAttributes").getAll().onsuccess = function (event) {
+            it("should initialize gameAttributes object store", function () {
+                return dao.gameAttributes.getAll().then(function (gameAttributes) {
                     var count, gTest, key;
 
-                    gTest = _.reduce(event.target.result, function (obj, row) { obj[row.key] = row.value; return obj; }, {});
+                    gTest = gameAttributes.reduce(function (obj, row) { obj[row.key] = row.value; return obj; }, {});
 
                     gTest.gamesInProgress.should.equal(false);
                     gTest.lastDbChange.should.be.a("number");
@@ -56,6 +55,8 @@ define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], funct
                     gTest.stopGames.should.equal(false);
                     gTest.userTid.should.equal(0);
                     gTest.gameOver.should.equal(false);
+                    gTest.daysLeft.should.equal(0);
+                    gTest.showFirstOwnerMessage.should.equal(false);
 
                     count = 0;
                     for (key in gTest) {
@@ -64,24 +65,20 @@ define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], funct
                         }
                     }
 
-                    count.should.equal(12);
-
-                    done();
-                };
+                    count.should.equal(25);
+                });
             });
-            it("should initialize draftOrder object store", function (done) {
-                g.dbl.transaction("draftOrder").objectStore("draftOrder").getAll().onsuccess = function (event) {
-                    event.target.result.should.have.length(1);
-                    event.target.result[0].rid.should.equal(1);
-                    event.target.result[0].draftOrder.should.have.length(0);
-                    done();
-                };
+            it("should initialize draftOrder object store", function () {
+                return dao.draftOrder.getAll().then(function (draftOrder) {
+                    draftOrder.should.have.length(1);
+                    draftOrder[0].rid.should.equal(1);
+                    draftOrder[0].draftOrder.should.have.length(0);
+                });
             });
-            it("should initialize teams object store", function (done) {
-                g.dbl.transaction("teams").objectStore("teams").getAll().onsuccess = function (event) {
-                    var cids, dids, i, teams;
+            it("should initialize teams object store", function () {
+                return dao.teams.getAll().then(function (teams) {
+                    var cids, dids, i;
 
-                    teams = event.target.result;
                     cids = _.pluck(teams, "cid");
                     dids = _.pluck(teams, "did");
 
@@ -92,38 +89,32 @@ define(["db", "globals", "core/league", "lib/underscore", "test/helpers"], funct
                     for (i = 0; i < 6; i++) {
                         testHelpers.numInArrayEqualTo(dids, i).should.equal(5);
                     }
-                    for (i = 0; i < 30; i++) {
+                    for (i = 0; i < g.numTeams; i++) {
                         teams[i].name.should.be.a("string");
                         teams[i].region.should.be.a("string");
                         teams[i].tid.should.be.a("number");
                         teams[i].seasons.should.have.length(1);
                         teams[i].stats.should.have.length(1);
                     }
-
-                    done();
-                };
+                });
             });
-            it("should initialize trade object store", function (done) {
-                g.dbl.transaction("trade").objectStore("trade").getAll().onsuccess = function (event) {
-                    event.target.result.should.have.length(1);
-                    event.target.result[0].rid.should.equal(0);
-                    event.target.result[0].otherTid.should.equal(1);
-                    event.target.result[0].otherPids.should.have.length(0);
-                    event.target.result[0].userPids.should.have.length(0);
-                    done();
-                };
+            it("should initialize trade object store", function () {
+                return dao.trade.getAll().then(function (tr) {
+                    tr.should.have.length(1);
+                    tr[0].rid.should.equal(0);
+                    tr[0].teams.should.have.length(2);
+                });
             });
-            it("should initialize players object store", function (done) {
-                g.dbl.transaction("players").objectStore("players").getAll().onsuccess = function (event) {
-                    event.target.result.should.have.length(33 * 14);
-                    done();
-                };
+            it("should initialize players object store", function () {
+                return dao.players.getAll().then(function (players) {
+                    players.should.have.length(33 * 14 + 70 * 3);
+                });
             });
         });
 
         describe("#remove()", function () {
-            it("should remove league database", function (done) {
-                league.remove(g.lid, done);
+            it("should remove league database", function () {
+                return league.remove(g.lid);
             });
         });
     });

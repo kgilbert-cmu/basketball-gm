@@ -2,7 +2,7 @@
  * @name util.advStats
  * @namespace Advanced stats (PER, WS, etc) that require some nontrivial calculations and thus are calculated and cached once each day.
  */
-define(["globals", "core/player", "core/team", "lib/underscore"], function (g, player, team, _) {
+define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/underscore"], function (dao, g, player, team, Promise, _) {
     "use strict";
 
     /**
@@ -13,22 +13,22 @@ define(["globals", "core/player", "core/team", "lib/underscore"], function (g, p
      * In the playoffs, only playoff stats are used.
      *
      * @memberOf util.advStats
-     * @param {function()} cb Callback function.
+     * @return {Promise}
      */
-    function calculatePER(cb) {
+    function calculatePER() {
         // Total team stats (not per game averages) - gp, pts, ast, fg, plus all the others needed for league totals
-        team.filter({
+        return team.filter({
             attrs: ["tid"],
             stats: ["gp", "ft", "pf", "ast", "fg", "pts", "fga", "orb", "tov", "fta", "trb", "oppPts"],
             season: g.season,
             totals: true,
             playoffs: g.PHASE.PLAYOFFS === g.phase
-        }, function (teams) {
+        }).then(function (teams) {
             var i, league, leagueStats;
 
             // Total league stats (not per game averages) - gp, ft, pf, ast, fg, pts, fga, orb, tov, fta, trb
             leagueStats = ["gp", "ft", "pf", "ast", "fg", "pts", "fga", "orb", "tov", "fta", "trb"];
-            league = _.reduce(teams, function (memo, team) {
+            league = teams.reduce(function (memo, team) {
                 var i;
                 for (i = 0; i < leagueStats.length; i++) {
                     if (memo.hasOwnProperty(leagueStats[i])) {
@@ -40,26 +40,44 @@ define(["globals", "core/player", "core/team", "lib/underscore"], function (g, p
                 return memo;
             }, {});
 
+            // If no games have been played, somehow, don't continue. But why would no games be played? I don't know, but it happens some times.
+            if (league.gp === 0) {
+                return;
+            }
+
             // Calculate pace for each team, using the "estimated pace adjustment" formula rather than the "pace adjustment" formula because it's simpler and ends up at nearly the same result. To do this the real way, I'd probably have to store the number of possessions from core.gameSim.
             for (i = 0; i < teams.length; i++) {
                 //estimated pace adjustment = 2 * lg_PPG / (team_PPG + opp_PPG)
                 teams[i].pace = 2 * (league.pts / league.gp) / (teams[i].pts / teams[i].gp + teams[i].oppPts / teams[i].gp);
+
+                // Handle divide by 0 error - check for NaN
+                if (teams[i].pace !== teams[i].pace) {
+                    teams[i].pace = 1;
+                }
             }
 
             // Total player stats (not per game averages) - min, tp, ast, fg, ft, tov, fga, fta, trb, orb, stl, blk, pf
             // Active players have tid >= 0
-            g.dbl.transaction("players").objectStore("players").index("tid").getAll(IDBKeyRange.lowerBound(0)).onsuccess = function (event) {
-                var aPER, drbp, factor, i, PER, players, tid, uPER, vop, tx;
+            return dao.players.getAll({
+                index: "tid",
+                key: IDBKeyRange.lowerBound(0),
+                statsSeasons: [g.season],
+                statsPlayoffs: g.PHASE.PLAYOFFS === g.phase
+            // Can't drop this then to another level because of the short circuit return above
+            }).then(function (players) {
+                var EWA, PER, aPER, drbp, factor, i, mins, tid, tx, uPER, vop;
 
-                players = player.filter(event.target.result, {
+                players = player.filter(players, {
                     attrs: ["pid", "tid"],
                     stats: ["min", "tp", "ast", "fg", "ft", "tov", "fga", "fta", "trb", "orb", "stl", "blk", "pf"],
+                    ratings: ["pos"],
                     season: g.season,
                     totals: true,
                     playoffs: g.PHASE.PLAYOFFS === g.phase
                 });
 
                 aPER = [];
+                mins = [];
                 league.aPER = 0;
                 for (i = 0; i < players.length; i++) {
                     tid = players[i].tid;
@@ -99,6 +117,8 @@ define(["globals", "core/player", "core/team", "lib/underscore"], function (g, p
 
                         aPER[i] = teams[tid].pace * uPER;
                         league.aPER = league.aPER + aPER[i] * players[i].stats.min;
+
+                        mins[i] = players[i].stats.min; // Save for EWA calculation
                     }
                 }
 
@@ -106,34 +126,65 @@ define(["globals", "core/player", "core/team", "lib/underscore"], function (g, p
 
                 PER = _.map(aPER, function (num) { return num * (15 / league.aPER); });
 
-                // Save to database. Active players have tid >= 0
-                tx = g.dbl.transaction("players", "readwrite");
-                tx.objectStore("players").index("tid").openCursor(IDBKeyRange.lowerBound(0)).onsuccess = function (event) {
-                    var cursor, i, p;
+                // Estimated Wins Added http://insider.espn.go.com/nba/hollinger/statistics
+                EWA = [];
+                (function () {
+                    var i, prl, prls, va;
 
-                    cursor = event.target.result;
-                    if (cursor) {
-                        p = cursor.value;
+                    // Position Replacement Levels
+                    prls = {
+                        PG: 11,
+                        G: 10.75,
+                        SG: 10.5,
+                        GF: 10.5,
+                        SF: 10.5,
+                        F: 11,
+                        PF: 11.5,
+                        FC: 11.05,
+                        C: 10.6
+                    };
 
-                        for (i = 0; i < players.length; i++) {
-                            if (PER[i] !== undefined && !isNaN(PER[i]) && players[i].pid === p.pid) {
-                                _.last(p.stats).per = PER[i];  // This will be either playoffs or regular season, as appropriate
-
-                                cursor.update(p);
-
-                                break;
+                    for (i = 0; i < players.length; i++) {
+                        if (players[i].active) {
+                            if (prls.hasOwnProperty(players[i].ratings.pos)) {
+                                prl = prls[players[i].ratings.pos];
+                            } else {
+                                // This should never happen unless someone manually enters the wrong position, which can happen in custom roster files
+                                prl = 10.75;
                             }
-                        }
 
-                        cursor.continue();
+                            va = players[i].stats.min * (PER[i] - prl) / 67;
+
+                            EWA[i] = va / 30 * 0.8; // 0.8 is a fudge factor to approximate the difference between (BBGM) EWA and (real) win shares
+                        }
                     }
-                };
-                tx.oncomplete = function () {
-                    if (cb !== undefined) {
-                        cb();
+                }());
+
+                // Save to database
+                tx = dao.tx("playerStats", "readwrite");
+                for (i = 0; i < players.length; i++) {
+                    if (players[i].active) {
+                        (function (i) {
+                            dao.playerStats.iterate({
+                                ot: tx,
+                                index: "pid, season, tid",
+                                key: [players[i].pid, g.season, players[i].tid],
+                                direction: "prev",
+                                callback: function (ps, shortCircuit) {
+                                    // Since index is not on playoffs, manually check
+                                    if (ps.playoffs === (g.phase === g.PHASE.PLAYOFFS)) {
+                                        shortCircuit();
+                                        ps.per = PER[i];
+                                        ps.ewa = EWA[i];
+                                        return ps;
+                                    }
+                                }
+                            });
+                        }(i));
                     }
-                };
-            };
+                }
+                return tx.complete();
+            });
         });
     }
 
@@ -144,10 +195,10 @@ define(["globals", "core/player", "core/team", "lib/underscore"], function (g, p
      * Currently this is just PER.
      *
      * @memberOf util.advStats
-     * @param {function()} cb Callback function.
+     * @return {Promise}
      */
-    function calculateAll(cb) {
-        calculatePER(cb);
+    function calculateAll() {
+        return calculatePER();
     }
 
     return {

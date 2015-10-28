@@ -1,6 +1,93 @@
-This is a list of **only the major changes** in each version.
+Don't read much into the release dates. Changes are pushed live as often as
+possible, regardless of whether I make an official release with a new version
+number or not.
 
-# 3.1.0 (2013-06-17)
+# 3.5.0 (???)
+
+## Gameplay and UI
+
+- Export Stats feature (player average stats or individual game stats)
+- More detailed info display: four factors in box scores, transaction log in player pages, etc.
+- Statistical Feats feature
+- Auto play multiple seasons
+- Screenshots
+- Multi Team Mode
+- Players can die
+- +/- and blocks against are recorded
+- New historical screens: Transactions, Awards Records, and Team Records
+
+## Techincal details
+
+- Wrapped all IndexedDB calls in a Promises-based abstraction layer
+- Phase changes (e.g. regular season to playoffs) happen in a single transaction and are cancellable, so inconsistend DB states should be harder to reach
+
+# 3.4.0 (2014-12-05)
+
+## Gameplay and UI
+
+- "God Mode" including Create A Player, Edit Player, and Force Trade
+- New trade AI, fixing a ton of loopholes
+- Achievements
+- Upcoming Free Agents page
+- Export of entire league data
+- Easy import of custom draft classes
+- Whole league export
+- More realistic player development algorithm
+
+## Technical details
+
+- Separated playerStats object store from players object store for performance
+
+# 3.3.0 (2014-01-21)
+
+## Gameplay and UI
+
+- AppCache used to allow offline play
+- Fantasy Draft feature
+- Extended free agency phase
+- Live play-by-play game simulation
+- Removed roster size limit restriction on trades
+- Centralized notification system and event log
+- Smarter in-game coach: substitutions are based on performance, not just ratings
+- GM firings happen after the playoffs, not before the regular season
+- Finals MVP award
+- Season totals, per 36 minutes stats, and career stats are viewable from the main player stats page
+- Option to delete old game data to improve performance
+- Future draft classes are visible up to 3 years in the future
+- New default team regions and names
+- Watch List where selected players can be tracked
+
+## Technical details
+
+- Refactored core.trade API
+
+# 3.2.0 (2013-10-05)
+
+## Gameplay and UI
+
+- New mobile-friendly design
+- Trading Block feature
+- "What would make this deal work?" button can add assets from either team
+- Removed the ability to "buy out" players to get rid of bad contracts
+- AI teams will not trade away more than two draft picks in a single trade
+- Fewer high-rated big men are generated
+- Support for customized team names
+- Support for player images in custom rosters
+- After being fired, you can get hired by another team
+- Quarter-by-quarter scoring in box scores
+
+## Technical details
+
+- Upgraded to Bootstrap 3
+- Added ability to alert users to new features without relying on an IndexedDB upgrade
+
+# 3.1.1 (2013-07-26)
+
+## Technical details
+
+- Just a bunch of minor bug fixes
+
+# 3.1.0 (2013-07-17)
 
 ## Gameplay and UI
 

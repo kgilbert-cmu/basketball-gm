@@ -2,35 +2,41 @@
  * @name views.dashboard
  * @namespace Dashboard.
  */
-define(["globals", "ui", "lib/jquery", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, $, bbgmView, helpers, viewHelpers) {
+define(["dao", "ui", "util/bbgmView", "util/viewHelpers"], function (dao, ui, bbgmView, viewHelpers) {
     "use strict";
 
-    function updateDashboard(inputs, updateEvents) {
-        var deferred;
-
-        deferred = $.Deferred();
-
-        g.dbm.transaction("leagues").objectStore("leagues").getAll().onsuccess = function (event) {
-            var data, i, leagues, teams;
-
-            leagues = event.target.result;
-            teams = helpers.getTeams();
+    function updateDashboard() {
+        return dao.leagues.getAll().then(function (leagues) {
+            var i, otherUrl;
 
             for (i = 0; i < leagues.length; i++) {
-                leagues[i].region = teams[leagues[i].tid].region;
-                leagues[i].teamName = teams[leagues[i].tid].name;
+                if (leagues[i].teamRegion === undefined) {
+                    leagues[i].teamRegion = "???";
+                }
+                if (leagues[i].teamName === undefined) {
+                    leagues[i].teamName = "???";
+                }
                 delete leagues[i].tid;
             }
 
-            deferred.resolve({
-                leagues: leagues
-            });
-        };
+            // http/https crap
+            if (window.location.protocol === "http:") {
+                if (leagues.length === 0 && window.location.hostname.indexOf("basketball-gm") >= 0) {
+                    window.location.replace("https://" + window.location.hostname + "/");
+                }
+                otherUrl = "https://" + window.location.hostname + "/";
+            } else {
+                otherUrl = "http://" + window.location.hostname + "/";
+            }
 
-        return deferred.promise();
+            return {
+                leagues: leagues,
+                otherUrl: otherUrl
+            };
+        });
     }
 
-    function uiFirst(vm) {
+    function uiFirst() {
         ui.title("Dashboard");
     }
 

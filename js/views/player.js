@@ -2,10 +2,8 @@
  * @name views.player
  * @namespace View a single message.
  */
-define(["globals", "ui", "core/freeAgents", "core/player", "lib/faces", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "util/bbgmView", "util/viewHelpers"], function (g, ui, freeAgents, player, faces, $, ko, komapping, bbgmView, viewHelpers) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/trade", "lib/faces", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "lib/bluebird", "util/bbgmView", "util/helpers"], function (dao, g, ui, freeAgents, player, trade, faces, $, ko, komapping, Promise, bbgmView, helpers) {
     "use strict";
-
-    var mapping;
 
     function get(req) {
         return {
@@ -13,37 +11,25 @@ define(["globals", "ui", "core/freeAgents", "core/player", "lib/faces", "lib/jqu
         };
     }
 
-    mapping = {
-        player: {
-            create: function (options) {
-                return new function () {
-                    komapping.fromJS(options.data, {
-                        face: {
-                            create: function (options) {
-//console.log('mapping');
-//console.log(options.data);
-                                return ko.observable(options.data);
-                            }
-                        }
-                    }, this);
-                }();
-            }
-        }
-    };
-
     function updatePlayer(inputs, updateEvents, vm) {
-        var deferred;
-
-        deferred = $.Deferred();
-
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || !vm.retired()) {
-            g.dbl.transaction("players").objectStore("players").get(inputs.pid).onsuccess = function (event) {
-                var currentRatings, p;
+            return Promise.all([
+                dao.players.get({
+                    key: inputs.pid,
+                    statsSeasons: "all",
+                    statsPlayoffs: true
+                }),
+                dao.events.getAll({
+                    index: "pids",
+                    key: inputs.pid
+                })
+            ]).spread(function (p, events) {
+                var feats;
 
-                p = player.filter(event.target.result, {
-                    attrs: ["pid", "name", "tid", "abbrev", "teamRegion", "teamName", "pos", "age", "hgtFt", "hgtIn", "weight", "born", "contract", "draft", "face", "mood", "injury", "salaries", "salariesTotal", "awards", "freeAgentMood"],
-                    ratings: ["season", "abbrev", "age", "ovr", "pot", "hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb", "skills"],
-                    stats: ["season", "abbrev", "age", "gp", "gs", "min", "fg", "fga", "fgp", "fgAtRim", "fgaAtRim", "fgpAtRim", "fgLowPost", "fgaLowPost", "fgpLowPost", "fgMidRange", "fgaMidRange", "fgpMidRange", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "pf", "pts", "per"],
+                p = player.filter(p, {
+                    attrs: ["pid", "name", "tid", "abbrev", "teamRegion", "teamName", "age", "hgtFt", "hgtIn", "weight", "born", "diedYear", "contract", "draft", "face", "mood", "injury", "salaries", "salariesTotal", "awardsGrouped", "freeAgentMood", "imgURL", "watch", "gamesUntilTradable"],
+                    ratings: ["season", "abbrev", "age", "ovr", "pot", "hgt", "stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "blk", "stl", "drb", "pss", "reb", "skills", "pos"],
+                    stats: ["season", "abbrev", "age", "gp", "gs", "min", "fg", "fga", "fgp", "fgAtRim", "fgaAtRim", "fgpAtRim", "fgLowPost", "fgaLowPost", "fgpLowPost", "fgMidRange", "fgaMidRange", "fgpMidRange", "tp", "tpa", "tpp", "ft", "fta", "ftp", "pm", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "per", "ewa"],
                     playoffs: true,
                     showNoStats: true,
                     showRookies: true,
@@ -55,20 +41,49 @@ define(["globals", "ui", "core/freeAgents", "core/player", "lib/faces", "lib/jqu
                     p.contract.amount = freeAgents.amountWithMood(p.contract.amount, p.freeAgentMood[g.userTid]);
                 }
 
-                currentRatings = p.ratings[p.ratings.length - 1];
+                feats = events.filter(function (event) {
+                    if (event.type === "playerFeat") {
+                        return true;
+                    }
 
-                deferred.resolve({
+                    return false;
+                }).map(function (event) {
+                    return {
+                        season: event.season,
+                        text: event.text
+                    };
+                });
+
+                events = events.filter(function (event) {
+                    if (event.type === "award" || event.type === "injured" || event.type === "healed" || event.type === "hallOfFame" || event.type === "playerFeat" || event.type === "tragedy") {
+                        return false;
+                    }
+
+                    return true;
+                }).map(function (event) {
+                    return {
+                        season: event.season,
+                        text: event.text
+                    };
+                });
+
+                // Add untradable property
+                p = trade.filterUntradable([p])[0];
+                events.map(helpers.correctLinkLid);
+                feats.map(helpers.correctLinkLid);
+
+                return {
                     player: p,
-                    currentRatings: currentRatings,
                     showTradeFor: p.tid !== g.userTid && p.tid >= 0,
                     freeAgent: p.tid === g.PLAYER.FREE_AGENT,
                     retired: p.tid === g.PLAYER.RETIRED,
-                    showContract: p.tid !== g.PLAYER.UNDRAFTED && p.tid !== g.PLAYER.RETIRED,
-                    injured: p.injury.type !== "Healthy"
-                });
-            };
-
-            return deferred.promise();
+                    showContract: p.tid !== g.PLAYER.UNDRAFTED && p.tid !== g.PLAYER.UNDRAFTED_2 && p.tid !== g.PLAYER.UNDRAFTED_3 && p.tid !== g.PLAYER.UNDRAFTED_FANTASY_TEMP && p.tid !== g.PLAYER.RETIRED,
+                    injured: p.injury.type !== "Healthy",
+                    godMode: g.godMode,
+                    events: events,
+                    feats: feats
+                };
+            });
         }
     }
 
@@ -78,15 +93,32 @@ define(["globals", "ui", "core/freeAgents", "core/player", "lib/faces", "lib/jqu
         }).extend({throttle: 1});
 
         ko.computed(function () {
-//console.log(vm.player.face())
-            faces.display("picture", vm.player.face());
+            var img, pic;
+
+            // Manually clear picture, since we're not using Knockout for this
+            pic = document.getElementById("picture");
+            while (pic.firstChild) {
+                pic.removeChild(pic.firstChild);
+            }
+
+            // If playerImgURL is not an empty string, use it instead of the generated face
+            if (vm.player.imgURL()) {
+                img = document.createElement("img");
+                img.src = vm.player.imgURL();
+                img.style.maxHeight = "100%";
+                img.style.maxWidth = "100%";
+                pic.appendChild(img);
+            } else {
+                faces.display("picture", komapping.toJS(vm.player.face));
+            }
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($(".table-clickable-rows"));
     }
 
     return bbgmView.init({
         id: "player",
         get: get,
-        mapping: mapping,
         runBefore: [updatePlayer],
         uiFirst: uiFirst
     });

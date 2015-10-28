@@ -2,12 +2,30 @@
  * @name test.core.player
  * @namespace Tests for core.player.
  */
-define(["globals", "core/player"], function (g, player) {
+/*eslint no-unused-expressions: 0*/
+define(["globals", "core/player", "lib/underscore", "util/helpers"], function (g, player, _, helpers) {
     "use strict";
+
+    // Synchronous version of player.addStatsRow which does not require IndexedDB
+    function addStatsRow(p, playoffs) {
+        playoffs = playoffs !== undefined ? playoffs : false;
+
+        p.stats.push({season: g.season, tid: p.tid, playoffs: playoffs, gp: 0, gs: 0, min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, orb: 0, drb: 0, trb: 0, ast: 0, tov: 0, stl: 0, blk: 0, pf: 0, pts: 0, per: 0, ewa: 0});
+        p.statsTids.push(p.tid);
+        p.statsTids = _.uniq(p.statsTids);
+
+        return p;
+    }
+
+    // Default values needed
+    g.teamAbbrevsCache = _.pluck(helpers.getTeamsDefault(), "abbrev");
+    g.numTeams = 30;
+    g.userTids = [0];
 
     describe("core/player", function () {
         describe("#generate()", function () {
-            it("should add stats row only for players generated on teams, not free agents or undrafted players", function () {
+            it.skip("should add stats row only for players generated on teams, not free agents or undrafted players", function () {
+// Needs DB to check since stats are not in player object anymore
                 var p;
 
                 p = player.generate(-2, 19, "", 25, 55, 2012, false, 15.5);
@@ -23,26 +41,105 @@ define(["globals", "core/player"], function (g, player) {
                 p.stats.length.should.equal(1);
             });
         });
+
+        describe("#madeHof()", function () {
+            it("should correctly assign players to the Hall of Fame", function () {
+                var p;
+
+                // Like player from http://www.reddit.com/r/BasketballGM/comments/222k8b/so_a_10x_dpoy_apparently_doesnt_have_what_it/
+                p = player.generate(0, 19, "", 25, 55, 2012, false, 15.5);
+                p.stats = [{
+                    min: 1 * 2.6,
+                    per: 18.7,
+                    ewa: 0
+                }, {
+                    min: 77 * 19.3,
+                    per: 13,
+                    ewa: 1.1
+                }, {
+                    min: 82 * 26,
+                    per: 18.9,
+                    ewa: 6.6
+                }, {
+                    min: 82 * 33.9,
+                    per: 15.3,
+                    ewa: 4.7
+                }, {
+                    min: 79 * 33.8,
+                    per: 16,
+                    ewa: 5.3
+                }, {
+                    min: 81 * 31,
+                    per: 17.1,
+                    ewa: 6.1
+                }, {
+                    min: 80 * 28,
+                    per: 16.2,
+                    ewa: 4.6
+                }, {
+                    min: 82 * 34.1,
+                    per: 16.6,
+                    ewa: 6.2
+                }, {
+                    min: 80 * 34.8,
+                    per: 16.9,
+                    ewa: 6.5
+                }, {
+                    min: 82 * 31.7,
+                    per: 17.8,
+                    ewa: 7
+                }, {
+                    min: 81 * 33.5,
+                    per: 18.8,
+                    ewa: 8.3
+                }, {
+                    min: 82 * 32,
+                    per: 17.8,
+                    ewa: 7
+                }, {
+                    min: 82 * 30.5,
+                    per: 17,
+                    ewa: 5.9
+                }, {
+                    min: 76 * 30.6,
+                    per: 16.3,
+                    ewa: 4.8
+                }, {
+                    min: 82 * 30.8,
+                    per: 16,
+                    ewa: 5
+                }, {
+                    min: 82 * 28,
+                    per: 15.6,
+                    ewa: 4.1
+                }];
+
+                player.madeHof(p).should.be.false;
+            });
+        });
+
         describe("#filter()", function () {
             var p;
 
             before(function () {
                 g.season = 2011;
                 p = player.generate(g.PLAYER.UNDRAFTED, 19, "", 50, 60, 2011, false, 28);
+                p.stats = []; // Fake it being here
                 p.tid = 4;
 
                 g.season = 2012;
-                p = player.addStatsRow(p);
+// Replace with static array of stats row in helper function addStatsRow
+                p = addStatsRow(p);
                 p = player.addRatingsRow(p, 15);
 
                 p.contract.exp = g.season + 1;
 
                 p.stats[0].gp = 5;
                 p.stats[0].fg = 20;
-                p = player.addStatsRow(p, true);
+                p = addStatsRow(p, true);
                 p.stats[1].gp = 3;
                 p.stats[1].fg = 30;
-                p = player.addStatsRow(p);
+                p = addStatsRow(p);
                 p.stats[2].season = 2013;
                 p.stats[2].tid = 0;
                 p.stats[2].gp = 8;
@@ -71,7 +168,7 @@ define(["globals", "core/player"], function (g, player) {
                 pf.ratings.ovr.should.be.a("number");
                 Object.keys(pf.ratings).should.have.length(2);
                 pf.stats.season.should.equal(2012);
-                pf.stats.abbrev.should.equal("CHI");
+                pf.stats.abbrev.should.equal("CIN");
                 pf.stats.fg.should.be.a("number");
                 pf.stats.fgp.should.be.a("number");
                 pf.stats.per.should.be.a("number");
@@ -99,7 +196,7 @@ define(["globals", "core/player"], function (g, player) {
                     pf[i].ratings.ovr.should.be.a("number");
                     Object.keys(pf[i].ratings).should.have.length(2);
                     pf[i].stats.season.should.equal(2012);
-                    pf[i].stats.abbrev.should.equal("CHI");
+                    pf[i].stats.abbrev.should.equal("CIN");
                     pf[i].stats.fg.should.be.a("number");
                     pf[i].stats.fgp.should.be.a("number");
                     pf[i].stats.per.should.be.a("number");
@@ -124,7 +221,7 @@ define(["globals", "core/player"], function (g, player) {
                 pf.ratings.ovr.should.be.a("number");
                 Object.keys(pf.ratings).should.have.length(2);
                 pf.stats.season.should.equal(2012);
-                pf.stats.abbrev.should.equal("CHI");
+                pf.stats.abbrev.should.equal("CIN");
                 pf.stats.fg.should.be.a("number");
                 pf.stats.fgp.should.be.a("number");
                 pf.stats.per.should.be.a("number");
@@ -148,7 +245,7 @@ define(["globals", "core/player"], function (g, player) {
                 pf.awards.should.have.length(0);
                 pf.hasOwnProperty("ratings").should.equal(false);
                 pf.stats.season.should.equal(2012);
-                pf.stats.abbrev.should.equal("CHI");
+                pf.stats.abbrev.should.equal("CIN");
                 pf.stats.fg.should.be.a("number");
                 pf.stats.fgp.should.be.a("number");
                 pf.stats.per.should.be.a("number");
@@ -387,7 +484,7 @@ define(["globals", "core/player"], function (g, player) {
                 pf.ratings[2].season.should.equal(2013);
                 pf.ratings[2].ovr.should.be.a("number");
                 pf.stats[0].season.should.equal(2012);
-                pf.stats[0].abbrev.should.equal("CHI");
+                pf.stats[0].abbrev.should.equal("CIN");
                 pf.stats[0].fg.should.equal(20);
                 pf.stats[1].season.should.equal(2013);
                 pf.stats[1].abbrev.should.equal("ATL");
@@ -414,7 +511,7 @@ define(["globals", "core/player"], function (g, player) {
                 pf.ratings[0].ovr.should.be.a("number");
                 pf.ratings.should.have.length(1);
                 pf.stats[0].season.should.equal(2012);
-                pf.stats[0].abbrev.should.equal("CHI");
+                pf.stats[0].abbrev.should.equal("CIN");
                 pf.stats[0].fg.should.equal(20);
                 pf.stats.should.have.length(1);
                 pf.careerStats.fg.should.equal(20);

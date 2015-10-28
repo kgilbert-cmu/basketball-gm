@@ -2,30 +2,27 @@
  * @name test.core.finances
  * @namespace Tests for core.finances.
  */
-define(["db", "globals", "core/league", "core/finances"], function (db, g, league, finances) {
+define(["dao", "db", "globals", "core/league", "core/finances"], function (dao, db, g, league, finances) {
     "use strict";
 
     describe("core/finances", function () {
-        before(function (done) {
-            db.connectMeta(function () {
-                league.create("Test", 0, undefined, function () {
-                    done();
-                });
+        before(function () {
+            return db.connectMeta().then(function () {
+                return league.create("Test", 0, undefined, 2013, false);
             });
         });
-        after(function (done) {
-            league.remove(g.lid, done);
+        after(function () {
+            return league.remove(g.lid);
         });
 
-        describe("#assesPayrollMinLuxury()", function () {
-            it("should store payroll and appropriately assess luxury and minimum payroll taxes for each team", function (done) {
-                finances.assesPayrollMinLuxury(function () {
-                    g.dbl.transaction("teams").objectStore("teams").getAll().onsuccess = function (event) {
-                        var i, teams;
+        describe("#assessPayrollMinLuxury()", function () {
+            it("should store payroll and appropriately assess luxury and minimum payroll taxes for each team", function () {
+                var tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
+                return finances.assessPayrollMinLuxury(tx).then(function () {
+                    return dao.teams.getAll({ot: tx}).then(function (teams) {
+                        var i;
 
-                        teams = event.target.result;
-
-                        for (i = 0; i < 30; i++) {
+                        for (i = 0; i < g.numTeams; i++) {
                             teams[i].seasons[0].payrollEndOfSeason.should.be.above(0);
 
                             if (teams[i].seasons[0].payrollEndOfSeason > g.luxuryPayroll) {
@@ -40,9 +37,7 @@ define(["db", "globals", "core/league", "core/finances"], function (db, g, leagu
                                 teams[i].seasons[0].expenses.minTax.amount.should.equal(0);
                             }
                         }
-
-                        done();
-                    };
+                    });
                 });
             });
         });

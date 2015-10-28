@@ -2,91 +2,144 @@
  * @name views.newLeague
  * @namespace Create new league form.
  */
-define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, league, $, bbgmView, helpers, viewHelpers) {
+define(["dao", "ui", "core/league", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (dao, ui, league, Promise, $, ko, komapping, bbgmView, helpers, viewHelpers) {
     "use strict";
 
-    function post(req) {
-        var file, reader, tid;
-
-        $("#create-new-league").attr("disabled", "disabled");
-
-        tid = Math.floor(req.params.tid);
-        if (tid >= 0 && tid <= 29) {
-            // Davis.js can't handle file uploads, so do this manually first
-            if (req.params.rosters === "custom-rosters") {
-                file = $("input[name='custom-rosters']").get(0).files[0];
-                if (file !== undefined) {
-                    reader = new window.FileReader();
-                    reader.readAsText(file);
-                    reader.onload = function (event) {
-                        league.create(req.params.name, tid, JSON.parse(event.target.result).players, function (lid) {
-                            ui.realtimeUpdate([], "/l/" + lid);
-                        });
-                    };
-                } else {
-                    league.create(req.params.name, tid, undefined, function (lid) {
-                        ui.realtimeUpdate([], "/l/" + lid);
-                    });
-                }
-            } else {
-                league.create(req.params.name, tid, undefined, function (lid) {
-                    ui.realtimeUpdate([], "/l/" + lid);
-                });
-            }
-        }
+    function InitViewModel() {
+        this.invalidLeagueFile = ko.observable(false);
+        this.uploadSelected = ko.observable(false);
+        this.disableSubmit = ko.computed(function () {
+            return this.invalidLeagueFile() && this.uploadSelected();
+        }, this);
     }
 
-    function updateNewLeague(inputs, updateEvents) {
-        var deferred;
+    // Keep only relevant information, otherwise Knockout has to do extra work creating all kinds of observables
+    function removeUnneededTeamProps(teams) {
+        var i, prop, propsToKeep;
 
-        deferred = $.Deferred();
+        // These are used in newLeague.html and updatePopText
+        propsToKeep = ["name", "pop", "popRank", "region", "tid"];
 
-        g.dbm.transaction("leagues").objectStore("leagues").openCursor(null, "prev").onsuccess = function (event) {
-            var cursor, data, l, newLid, teams;
+        for (i = 0; i < teams.length; i++) {
+            // Remove unneeded properties
+            for (prop in teams[i]) {
+                if (teams[i].hasOwnProperty(prop)) {
+                    if (propsToKeep.indexOf(prop) === -1) {
+                        delete teams[i][prop];
+                    }
+                }
+            }
+        }
 
-            cursor = event.target.result;
-            if (cursor) {
-                newLid = cursor.value.lid + 1;
-            } else {
+        return teams;
+    }
+
+    function post(req) {
+        Promise.try(function () {
+            var file, startingSeason, tid;
+
+            document.getElementById("create-new-league").disabled = true;
+
+            startingSeason = 2015;
+
+            tid = parseInt(req.params.tid, 10);
+            localStorage.lastSelectedTid = tid;
+
+            // Davis.js can't handle file uploads, so do this manually first
+            if (req.params.rosters === "custom-rosters") {
+                file = document.getElementById("custom-rosters-file").files[0];
+                if (file !== undefined) {
+                    return new Promise(function (resolve) {
+                        var reader;
+
+                        reader = new window.FileReader();
+                        reader.readAsText(file);
+                        reader.onload = function (event) {
+                            var leagueFile, randomizeRosters;
+
+                            leagueFile = JSON.parse(event.target.result);
+                            startingSeason = leagueFile.startingSeason !== undefined ? leagueFile.startingSeason : startingSeason;
+
+                            randomizeRosters = req.params.hasOwnProperty("randomize-rosters");
+
+                            league.create(req.params.name, tid, leagueFile, startingSeason, randomizeRosters).then(resolve);
+                        };
+                    });
+                }
+            }
+
+            return league.create(req.params.name, tid, null, startingSeason, false);
+        }).then(function (lid) {
+            ui.realtimeUpdate([], "/l/" + lid, function () {
+                // Show helpful information if this is the first league
+                if (lid === 1) {
+                    ui.highlightPlayButton();
+                }
+            });
+        });
+    }
+
+    function updateNewLeague() {
+        var newLid;
+
+        newLid = null;
+
+        // Find most recent league and add one to the LID
+        return dao.leagues.iterate({
+            direction: "prev",
+            callback: function (l, shortCircuit) {
+                newLid = l.lid + 1;
+                shortCircuit();
+            }
+        }).then(function () {
+            var teams;
+
+            if (newLid === null) {
                 newLid = 1;
             }
 
-            teams = helpers.getTeams();
-
-            deferred.resolve({
-                name: "League " + newLid,
-                teams: teams
+            teams = removeUnneededTeamProps(helpers.getTeamsDefault());
+            teams.unshift({
+                tid: -1,
+                region: "Random",
+                name: "Team"
             });
-        };
 
-        return deferred.promise();
+            return {
+                name: "League " + newLid,
+                teams: teams,
+                lastSelectedTid: parseInt(localStorage.lastSelectedTid, 10)
+            };
+        });
     }
 
     function uiFirst(vm) {
-        var selectRosters, selectTeam, teams, updatePopText, updateShowUploadForm;
+        var fileEl, newLeagueRostersEl, selectRosters, selectTeam, setTeams, updatePopText, updateShowUploadForm, useCustomTeams;
 
         ui.title("Create New League");
-
-        teams = helpers.getTeams();
 
         updatePopText = function () {
             var difficulty, team;
 
-            team = teams[selectTeam.val()];
+            team = vm.teams()[parseInt(selectTeam.val(), 10) + 1];
 
-            if (team.popRank <= 5) {
-                difficulty = "very easy";
-            } else if (team.popRank <= 13) {
-                difficulty = "easy";
-            } else if (team.popRank <= 16) {
-                difficulty = "normal";
-            } else if (team.popRank <= 23) {
-                difficulty = "hard";
+            if (team.tid() >= 0) {
+                if (team.popRank() <= 3) {
+                    difficulty = "very easy";
+                } else if (team.popRank() <= 8) {
+                    difficulty = "easy";
+                } else if (team.popRank() <= 16) {
+                    difficulty = "normal";
+                } else if (team.popRank() <= 24) {
+                    difficulty = "hard";
+                } else {
+                    difficulty = "very hard";
+                }
+
+                document.getElementById("pop-text").innerHTML = "Region population: " + team.pop() + " million, #" + team.popRank() + " leaguewide<br>Difficulty: " + difficulty;
             } else {
-                difficulty = "very hard";
+                document.getElementById("pop-text").innerHTML = "Region population: ?<br>Difficulty: ?";
             }
-
-            $("#pop-text").html("Region population: " + team.pop + " million, #" + team.popRank + " leaguewide<br>Difficulty: " + difficulty);
         };
 
         selectTeam = $("select[name='tid']");
@@ -96,8 +149,12 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
         updateShowUploadForm = function () {
             if (selectRosters.val() === "custom-rosters") {
                 $("#custom-rosters").show();
+                $("#randomize-rosters").show();
+                vm.uploadSelected(true);
             } else {
                 $("#custom-rosters").hide();
+                $("#randomize-rosters").hide();
+                vm.uploadSelected(false);
             }
         };
 
@@ -108,16 +165,90 @@ define(["globals", "ui", "core/league", "lib/jquery", "util/bbgmView", "util/hel
         updatePopText();
         updateShowUploadForm();
 
-        $("#help-rosters").clickover({
-            title: "Rosters",
-            html: true,
-            content: 'Rosters of the teams in your new league can either be filled by randomly-generated players or by players from a <a href="/manual/custom_rosters">custom roster file</a> you upload.'
+        // Handle custom roster teams
+        setTeams = function (newTeams) {
+            var i;
+
+            if (newTeams !== undefined) {
+                for (i = 0; i < newTeams.length; i++) {
+                    // Is pop hidden in season, like in editTeamInfo import?
+                    if (!newTeams[i].hasOwnProperty("pop") && newTeams[i].hasOwnProperty("seasons")) {
+                        newTeams[i].pop = newTeams[i].seasons[newTeams[i].seasons.length - 1].pop;
+                    }
+
+                    newTeams[i].pop = helpers.round(newTeams[i].pop, 2);
+                }
+
+                newTeams = helpers.addPopRank(newTeams);
+
+                newTeams = removeUnneededTeamProps(newTeams);
+
+                // Add random team
+                newTeams.unshift({
+                    tid: -1,
+                    region: "Random",
+                    name: "Team"
+                });
+
+                komapping.fromJS({teams: newTeams}, vm);
+            }
+
+            updatePopText();
+        };
+        useCustomTeams = function () {
+            var file, reader;
+
+            if (fileEl.files.length) {
+                vm.invalidLeagueFile(false);
+
+                file = fileEl.files[0];
+
+                reader = new window.FileReader();
+                reader.readAsText(file);
+                reader.onload = function (event) {
+                    var leagueFile, newTeams;
+
+                    try {
+                        leagueFile = JSON.parse(event.target.result);
+                    } catch (e) {
+                        vm.invalidLeagueFile(true);
+                        return;
+                    }
+
+                    newTeams = leagueFile.teams;
+                    setTeams(newTeams);
+
+                    // Is a userTid specified?
+                    if (leagueFile.hasOwnProperty("gameAttributes")) {
+                        leagueFile.gameAttributes.some(function (attribute) {
+                            if (attribute.key === "userTid") {
+                                // Set it to select the userTid entry
+                                document.getElementById("new-league-tid").value = attribute.value;
+                                updatePopText(); // Not caught by event handlers for some reason
+                                return true;
+                            }
+                        });
+                    }
+                };
+            }
+        };
+        fileEl = document.getElementById("custom-rosters-file");
+        fileEl.addEventListener("change", useCustomTeams);
+        // Handle switch away from custom roster teams
+        newLeagueRostersEl = document.getElementById("new-league-rosters");
+        newLeagueRostersEl.addEventListener("change", function () {
+            if (this.value === "custom-rosters") {
+                useCustomTeams();
+            } else {
+                setTeams(helpers.getTeamsDefault());
+            }
         });
     }
 
     return bbgmView.init({
         id: "newLeague",
         beforeReq: viewHelpers.beforeNonLeague,
+        InitViewModel: InitViewModel,
         post: post,
         runBefore: [updateNewLeague],
         uiFirst: uiFirst

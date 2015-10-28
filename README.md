@@ -1,67 +1,196 @@
-# Basketball GM 3.1.0
+# Basketball GM 3.4.0
 
 A single-player basketball simulation game. Make trades, set rosters, draft
 players, and try to build the next dynasty, all from within your web browser.
-The game is implemented entirely in client-side JavaScript, backed by
-IndexedDB.
+The game is implemented entirely in client-side JavaScript, backed by IndexedDB.
 
-* Website: http://www.basketball-gm.com/
+Copyright (C) Jeremy Scheff. All rights reserved.
 
-* Development website: https://github.com/jdscheff/basketball-gm
+* Email: commissioner@basketball-gm.com
+* Website: <http://basketball-gm.com/>
+* Development: <https://github.com/dumbmatter/basketball-gm>
+* Discussion: <http://www.reddit.com/r/BasketballGM/>
 
-* Main developer: Jeremy Scheff <jdscheff@gmail.com>
+**Basketball GM is NOT open source, but it is also not completely closed. Please
+see LICENSE.md for details.**
 
-## License
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License version 3 as published by
-the Free Software Foundation.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
-details.
-
-You should have received a copy of the GNU Affero General Public License along
-with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Installing and Running
 
-The easiest way to play is by going to http://play.basketball-gm.com/
+If you just want to play the game, go to <http://basketball-gm.com/>.
+Instructions below are for developers who want to run a copy locally so they can
+test changes to the code.
 
-Basketball GM requires a web browser with IndexedDB support. Mozilla Firefox
-(any recent version) works best and is most thoroughly tested. Google Chrome
-(version 23 or higher) works, but it's not as well tested as Firefox. Internet
-Explorer 10 seems to work, but it's not regularly tested.
-(TLDR: Use Firefox or maybe Chrome)
+To run the game locally, you need some way of running a web server to display
+the content. There are currently three ways to do it. It doesn't matter which
+you use as long as you can get it to run on your computer.
 
-If you want to run your own copy...
+#### 1. Mongoose - Easiest on Windows
 
-In addition to a supported browser, you need some way of running a web server to
-display the content. The easiest way is using the `runserver.py` file included
-here. First, install Python and web.py (as simple as `sudo apt-get install
-python-webpy` on Ubuntu). Then, from the command line, run:
+Run the included `mongoose-tiny-4.1.exe` and point your browser to
+<http://localhost:8080/>.
 
-    python runserver.py
+That's it.
 
-Finally, point your browser to http://0.0.0.0:8080/
+If that doesn't work, try right clicking on the Mongoose icon in your
+notification area and poke around in there. You can also see if there is a newer
+version of Mongoose available <http://cesanta.com/downloads.html>.
 
-If that URL doesn't work, try http://127.0.0.1:8080/
+#### 2. Express - Also quite easy
 
-Alternatively, the mod_rewrite rules in .htaccess can be used to make Apache
-run Basketball GM. Everything should work if you just have a domain/subdomain
-point at this folder with mod_rewrite enabled.
+Install Node, NPM, and Express. The easiest way to do that is to install Node
+and NPM from <http://nodejs.org/> and then run `npm install` from this folder
+to install Express (and some other things you might want later, see below). Then
+run
 
-## Debugging and Problem Solving
+    npm start
 
-If something starts behaving weirdly (this is beta software), you can reset you
-database by clicking the "Reset DB" link in the debug menu at the top. If that
-still doesn't work (which unfortunately happens sometimes with a corrupted
-database), you might have to just delete everything and start fresh. In Firefox,
-go to the `indexedDB` folder in your Firefox profile folder and delete the
-folder corresponding to your copy of Basketball GM (such as
-`http+++0.0.0.0+8080` if you're running it locally through web.py, or
-`http+++play.basketball-gm.com` if you're playing on the official website). That
-will delete all of the game's stored data.
+and point your browser to <http://localhost:3000/>. If that URL doesn't work,
+try <http://0.0.0.0:3000/>.
 
-To run the test suite, go to http://0.0.0.0:8080/test
+#### 3. Apache
+
+If you can't get one of the above methods to work, the mod_rewrite rules in
+`.htaccess` can be used to make Apache run Basketball GM. Everything should work
+if you just have a domain/subdomain point at this folder with mod_rewrite
+enabled.
+
+
+
+## Development Quick Start
+
+**Basketball GM is NOT open source, but it is also not completely closed. Please
+see LICENSE.md for details.**
+
+In production, JavaScript and CSS files are minified. See below for more info.
+But you don't really have to worry about that. You can bypass minification by
+going to Tools > Enable Debug Mode within the game. Then, edit any file in the
+`css`, `js`, or `templates` folders and reload the game to see your changes.
+
+If you want to contribute but get stuck somewhere, please contact me! I'm happy
+to help.
+
+
+
+## Important Development Info
+
+### License and Contributor License Agreement
+
+**Basketball GM is NOT open source, but it is also not completely closed. Please
+see LICENSE.md for details.**
+
+If you want to contribute code to Basketball GM, you must sign a contributor
+license agreement. There are separate forms for individuals and entities (such
+as corporations):
+
+* [Individual CLA](CLA-individual.md) (this is probably what you want)
+* [Entity CLA](CLA-entity.md)
+
+Make a copy of the form, fill in your information at the bottom, and send an
+email to commissioner@basketball-gm.com with the subject line, "Contributor
+License Agreement from YOUR_NAME_HERE (GITHUB_USERNAME_HERE)".
+
+### Tooling
+
+All of the tooling used in development can be installed by simply installing
+[npm](https://www.npmjs.com/) and running
+
+    npm install
+
+from within this folder.
+
+Basketball GM uses the RequireJS optimizer for JS minification and clean-css for
+CSS minification. To minify everything, run
+
+    npm run build
+
+But as mentioned above, if you enable Debug Mode, you don't need to do this
+during development.
+
+ESLint is used to enforce some coding standards. It's mostly pretty standard
+Crockfordian stuff. To run ESLint on the entire codebase, run
+
+    npm run lint
+
+Integration and unit tests are bunched together in the `js/test` folder.
+Coverage is not great. They can be run manually within a web browser by going to
+<http://localhost:8080/test> or from the command line in Karma with
+
+    npm test
+
+### Code Overview
+
+Basketball GM is a single-page app that runs almost entirely client-side by
+storing data in IndexedDB. All the application code is in the `js` folder.
+Modules are defined with RequireJS. Routes are set in `js/app.js`. Most of the
+important stuff is in `js/core`.
+
+UI is ultimately driven by `js/util/bbgmView.js`, a small UI layer I wrote on
+top of Knockout which is used by all the views in the `js/views` folder. Each
+view also has a corresponding HTML file in the `templates` folder. Adding a new
+page is kind of a bitch. You need to explicitly include the template file in
+`js/templates.js`, and explicitly include the view in `js/views.js`. Beyond
+that, my best guidance is to copy from an existing page and use that as a
+starting point.
+
+For database access, I wrote a very thin Promises-based wrapper around IndexedDB
+which can be found in `js/dao.js`. Understanding how IndexedDB works is critical
+in any non-trivial work on Basketball GM.
+
+### Documentation
+
+Code should ideally be documented as described in the Google Closure Compiler
+documentation:
+<https://developers.google.com/closure/compiler/docs/js-for-compiler>.
+Google Closure Compiler itself isn't actually used for anything (yet).
+
+### Git Workflow
+
+If you want to contribute changes back to the project, first create a fork on
+GitHub. Then make your changes in a new branch. Confirm that the tests
+(hopefully including new ones you wrote!) and ESLint all pass. Finally, send me
+a pull request.
+
+It's also probably a good idea to create an [issue on
+GitHub](https://github.com/dumbmatter/basketball-gm/issues) before you start
+working on something to keep me in the loop.
+
+
+
+## Less Important Development Info
+
+### Bootstrap
+
+Basketball GM's layout is currently based on Bootstrap 3.1.1 with the following
+options:
+
+* @font-size-base set to 13px
+
+### Basketball stuff
+
+Abbreviations of stats should be done like basketball-reference.com stat pages.
+For instance, "defensive rebounds" is "drb".
+
+### To do on new version
+
+- Make sure tests all pass (if necessary)
+
+- Write database upgrade code in `db.js` (if not already done piecemeal)
+
+- Write key changes in `js/data/changes.js`
+
+- Set version in index.html, CHANGES.md, and README.md, like <http://semver.org/>
+
+- Tag it in git like:
+
+        git tag -a v3.0.0-beta.2 -m ''
+        git push --tags
+
+### Cordova
+
+The game runs equally well within a web browser and within Cordova (Android
+4.4+). The codebase is designed to handle both situations (the main difference
+is absolute vs relative paths, governed by window.inCordova in index.html). To
+collect the files needed for Cordova, run `npm run build-cordova` and look in
+the cordova folder.

@@ -2,7 +2,7 @@
  * @name views.teamStats
  * @namespace Team stats table.
  */
-define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/underscore", "views/components", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, team, $, ko, _, components, bbgmView, helpers, viewHelpers) {
+define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/underscore", "views/components", "util/bbgmView", "util/helpers"], function (g, ui, team, $, ko, _, components, bbgmView, helpers) {
     "use strict";
 
     var mapping;
@@ -26,24 +26,18 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
     };
 
     function updateTeams(inputs, updateEvents, vm) {
-        var deferred;
-
         if (updateEvents.indexOf("dbChange") >= 0 || (inputs.season === g.season && (updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0)) || inputs.season !== vm.season()) {
-            deferred = $.Deferred();
-
-            team.filter({
+            return team.filter({
                 attrs: ["abbrev"],
                 seasonAttrs: ["won", "lost"],
-                stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "pf", "pts", "oppPts"],
+                stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff"],
                 season: inputs.season
-            }, function (teams) {
-                deferred.resolve({
+            }).then(function (teams) {
+                return {
                     season: inputs.season,
                     teams: teams
-                });
+                };
             });
-
-            return deferred.promise();
         }
     }
 
@@ -56,9 +50,20 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
             var season;
             season = vm.season();
             ui.datatableSinglePage($("#team-stats"), 2, _.map(vm.teams(), function (t) {
-                return ['<a href="' + helpers.leagueUrl(["roster", t.abbrev, season]) + '">' + t.abbrev + '</a>', String(t.gp), String(t.won), String(t.lost), helpers.round(t.fg, 1), helpers.round(t.fga, 1), helpers.round(t.fgp, 1), helpers.round(t.tp, 1), helpers.round(t.tpa, 1), helpers.round(t.tpp, 1), helpers.round(t.ft, 1), helpers.round(t.fta, 1), helpers.round(t.ftp, 1), helpers.round(t.orb, 1), helpers.round(t.drb, 1), helpers.round(t.trb, 1), helpers.round(t.ast, 1), helpers.round(t.tov, 1), helpers.round(t.stl, 1), helpers.round(t.blk, 1), helpers.round(t.pf, 1), helpers.round(t.pts, 1), helpers.round(t.oppPts, 1)];
-            }));
+                return ['<a href="' + helpers.leagueUrl(["roster", t.abbrev, season]) + '">' + t.abbrev + '</a>', String(t.gp), String(t.won), String(t.lost), helpers.round(t.fg, 1), helpers.round(t.fga, 1), helpers.round(t.fgp, 1), helpers.round(t.tp, 1), helpers.round(t.tpa, 1), helpers.round(t.tpp, 1), helpers.round(t.ft, 1), helpers.round(t.fta, 1), helpers.round(t.ftp, 1), helpers.round(t.orb, 1), helpers.round(t.drb, 1), helpers.round(t.trb, 1), helpers.round(t.ast, 1), helpers.round(t.tov, 1), helpers.round(t.stl, 1), helpers.round(t.blk, 1), helpers.round(t.ba, 1), helpers.round(t.pf, 1), helpers.round(t.pts, 1), helpers.round(t.oppPts, 1), helpers.round(t.diff, 1)];
+            }), {
+                rowCallback: function (row, data) {
+                    // Show point differential in green or red for positive or negative
+                    if (data[data.length - 1] > 0) {
+                        row.childNodes[row.childNodes.length - 1].classList.add("text-success");
+                    } else if (data[data.length - 1] < 0) {
+                        row.childNodes[row.childNodes.length - 1].classList.add("text-danger");
+                    }
+                }
+            });
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($("#team-stats"));
     }
 
     function uiEvery(updateEvents, vm) {

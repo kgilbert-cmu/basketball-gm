@@ -2,17 +2,18 @@
  * @name views.playoffs
  * @namespace Show current or archived playoffs, or projected matchups for an in-progress season.
  */
-define(["globals", "ui", "core/draft", "core/player", "lib/jquery", "util/bbgmView", "util/helpers", "util/viewHelpers", "views/components"], function (g, ui, draft, player, $, bbgmView, helpers, viewHelpers, components) {
+define(["dao", "globals", "ui", "core/draft", "core/player", "lib/bluebird", "lib/jquery", "util/bbgmView", "util/helpers"], function (dao, g, ui, draft, player, Promise, $, bbgmView, helpers) {
     "use strict";
 
     function updateDraftTables(pids) {
-        var draftedPlayer, draftedRows, i, j, undraftedTds;
+        var draftedPlayer, draftedRows, i, j, jMax, undraftedTds;
 
         for (i = 0; i < pids.length; i++) {
-            draftedPlayer = new Array(5);
+            draftedPlayer = [];
             // Find row in undrafted players table, get metadata, delete row
             undraftedTds = $("#undrafted-" + pids[i] + " td");
-            for (j = 0; j < 5; j++) {
+            jMax = g.phase === g.PHASE.FANTASY_DRAFT ? 8 : 5;
+            for (j = 0; j < jMax; j++) {
                 draftedPlayer[j] = undraftedTds[j].innerHTML;
             }
 
@@ -26,140 +27,214 @@ define(["globals", "ui", "core/draft", "core/player", "lib/jquery", "util/bbgmVi
                     draftedRows[j].children[4].innerHTML = draftedPlayer[2];
                     draftedRows[j].children[5].innerHTML = draftedPlayer[3];
                     draftedRows[j].children[6].innerHTML = draftedPlayer[4];
+                    if (g.phase === g.PHASE.FANTASY_DRAFT) {
+                        draftedRows[j].children[7].innerHTML = draftedPlayer[5];
+                        draftedRows[j].children[8].innerHTML = draftedPlayer[6];
+                        draftedRows[j].children[9].innerHTML = draftedPlayer[7];
+                    }
                     break;
                 }
             }
         }
     }
 
-    function draftUser(pid, cb) {
-        var transaction;
-
-        pid = parseInt(pid, 10);
-
-        draft.getOrder(function (draftOrder) {
-            var pick, playerStore;
+    function draftUser(pid) {
+        return draft.getOrder().then(function (draftOrder) {
+            var pick;
 
             pick = draftOrder.shift();
-            if (pick.tid === g.userTid) {
-                draft.selectPlayer(pick, pid, function (pid) {
-                    draft.setOrder(draftOrder, function () {
-                        cb(pid);
+            if (g.userTids.indexOf(pick.tid) >= 0) {
+                return draft.selectPlayer(pick, pid).then(function () {
+                    var tx;
+
+                    tx = dao.tx("draftOrder", "readwrite");
+                    draft.setOrder(tx, draftOrder);
+                    return tx.complete().then(function () {
+                        return pid;
                     });
                 });
-            } else {
-                console.log("ERROR: User trying to draft out of turn.");
             }
+
+            console.log("ERROR: User trying to draft out of turn.");
         });
     }
 
     function draftUntilUserOrEnd() {
-        ui.updateStatus('Draft in progress...');
-        var pids = draft.untilUserOrEnd(function (pids) {
-            var done = false;
-            if (g.phase === g.PHASE.AFTER_DRAFT) {
-                done = true;
-                ui.updateStatus('Idle');
-            }
+        ui.updateStatus("Draft in progress...");
+        draft.untilUserOrEnd().then(function (pids) {
+            draft.getOrder().then(function (draftOrder) {
+                var done;
 
-            updateDraftTables(pids);
-            if (!done) {
-                $("#undrafted button").removeAttr("disabled");
-            }
+                done = false;
+                if (draftOrder.length === 0) {
+                    done = true;
+                    ui.updateStatus("Idle");
+
+                    $("#undrafted th:last-child, #undrafted td:last-child").remove();
+                }
+
+                updateDraftTables(pids);
+                if (!done) {
+                    $("#undrafted button").removeAttr("disabled");
+                }
+            });
         });
     }
 
-    function get(req) {
-        if (g.phase !== g.PHASE.DRAFT) {
+    function get() {
+        if (g.phase !== g.PHASE.DRAFT && g.phase !== g.PHASE.FANTASY_DRAFT) {
             return {
                 redirectUrl: helpers.leagueUrl(["draft_summary"])
             };
         }
     }
 
-    function updateDraft(inputs, updateEvents, vm) {
-        var deferred, playerStore, vars;
+    function updateDraft() {
+        // DIRTY QUICK FIX FOR v10 db upgrade bug - eventually remove
+        // This isn't just for v10 db upgrade! Needed the same fix for http://www.reddit.com/r/BasketballGM/comments/2tf5ya/draft_bug/cnz58m2?context=3 - draft class not always generated with the correct seasons
+        var tx = dao.tx("players", "readwrite");
+        dao.players.get({
+            ot: tx,
+            index: "tid",
+            key: g.PLAYER.UNDRAFTED
+        }).then(function (p) {
+            var season;
 
-        deferred = $.Deferred();
-        vars = {};
+            season = p.ratings[0].season;
+            if (season !== g.season && g.phase === g.PHASE.DRAFT) {
+                console.log("FIXING FUCKED UP DRAFT CLASS");
+                console.log(season);
+                dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED,
+                    callback: function (p) {
+                        p.ratings[0].season = g.season;
+                        p.draft.year = g.season;
+                        return p;
+                    }
+                });
+            }
+        });
 
-        playerStore = g.dbl.transaction("players").objectStore("players");
-        playerStore.index("tid").getAll(g.PLAYER.UNDRAFTED).onsuccess = function (event) {
-            var undrafted;
+        return tx.complete().then(function () {
+            return Promise.all([
+                dao.players.getAll({
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED,
+                    statsSeasons: [g.season]
+                }),
+                dao.players.getAll({
+                    index: "draft.year",
+                    key: g.season,
+                    statsSeasons: [g.season]
+                })
+            ]);
+        }).spread(function (undrafted, players) {
+            var drafted, i, started;
 
-            undrafted = player.filter(event.target.result, {
-                attrs: ["pid", "name", "pos", "age", "injury"],
-                ratings: ["ovr", "pot", "skills"],
+            undrafted.sort(function (a, b) { return b.valueFuzz - a.valueFuzz; });
+            undrafted = player.filter(undrafted, {
+                attrs: ["pid", "name", "age", "injury", "contract", "watch"],
+                ratings: ["ovr", "pot", "skills", "pos"],
+                stats: ["per", "ewa"],
+                season: g.season,
+                showNoStats: true,
+                showRookies: true,
+                fuzz: true
+            });
+
+            players = player.filter(players, {
+                attrs: ["pid", "tid", "name", "age", "draft", "injury", "contract", "watch"],
+                ratings: ["ovr", "pot", "skills", "pos"],
+                stats: ["per", "ewa"],
                 season: g.season,
                 showRookies: true,
                 fuzz: true
             });
-            undrafted.sort(function (a, b) { return (b.ratings.ovr + 2 * b.ratings.pot) - (a.ratings.ovr + 2 * a.ratings.pot); });
 
-            playerStore.index("draft.year").getAll(g.season).onsuccess = function (event) {
-                var drafted, i, players, started;
-
-                players = player.filter(event.target.result, {
-                    attrs: ["pid", "tid", "name", "pos", "age", "draft", "injury"],
-                    ratings: ["ovr", "pot", "skills"],
-                    season: g.season,
-                    showRookies: true,
-                    fuzz: true
-                });
-
-                drafted = [];
-                for (i = 0; i < players.length; i++) {
-                    if (players[i].tid !== g.PLAYER.UNDRAFTED) {
-                        drafted.push(players[i]);
-                    }
+            drafted = [];
+            for (i = 0; i < players.length; i++) {
+                if (players[i].tid >= 0) {
+                    drafted.push(players[i]);
                 }
-                drafted.sort(function (a, b) { return (100 * a.draft.round + a.draft.pick) - (100 * b.draft.round + b.draft.pick); });
+            }
+            drafted.sort(function (a, b) { return (100 * a.draft.round + a.draft.pick) - (100 * b.draft.round + b.draft.pick); });
 
-                started = drafted.length > 0;
+            started = drafted.length > 0;
 
-                draft.getOrder(function (draftOrder) {
-                    var data, i, slot;
+            return draft.getOrder().then(function (draftOrder) {
+                var i, slot;
 
-                    for (i = 0; i < draftOrder.length; i++) {
-                        slot = draftOrder[i];
-                        drafted.push({
-                            draft: {
-                                abbrev: slot.abbrev,
-                                originalAbbrev: slot.originalAbbrev,
-                                round: slot.round,
-                                pick: slot.pick
-                            },
-                            pid: -1
-                        });
-                    }
+                for (i = 0; i < draftOrder.length; i++) {
+                    slot = draftOrder[i];
+                    drafted.push({
+                        draft: {
+                            tid: slot.tid,
+                            originalTid: slot.originalTid,
+                            round: slot.round,
+                            pick: slot.pick
+                        },
+                        pid: -1
+                    });
+                }
 
-                    vars = {undrafted: undrafted, drafted: drafted, started: started};
-                    deferred.resolve(vars);
-                });
-            };
-        };
-
-        return deferred.promise();
+                return {
+                    undrafted: undrafted,
+                    drafted: drafted,
+                    started: started,
+                    fantasyDraft: g.phase === g.PHASE.FANTASY_DRAFT,
+                    userTids: g.userTids
+                };
+            });
+        });
     }
 
     function uiFirst() {
-        var startDraft;
+        var startDraft, undraftedContainer;
 
         ui.title("Draft");
 
         startDraft = $("#start-draft");
-        startDraft.click(function (event) {
+        startDraft.click(function () {
             $(startDraft.parent()).hide();
             draftUntilUserOrEnd();
         });
 
-        $("#undrafted").on("click", "button", function (event) {
+        $("#undrafted").on("click", "button", function () {
             $("#undrafted button").attr("disabled", "disabled");
-            draftUser(this.getAttribute("data-player-id"), function (pid) {
+            draftUser(parseInt(this.getAttribute("data-player-id"), 10)).then(function (pid) {
                 updateDraftTables([pid]);
                 draftUntilUserOrEnd();
             });
         });
+
+        $("#view-drafted").click(function () {
+            $("body, html").animate({scrollLeft: $(document).outerWidth() - $(window).width()}, 250);
+        });
+        $("#view-undrafted").click(function () {
+            $("body, html").animate({scrollLeft: 0}, 250);
+        });
+
+        // Scroll undrafted to the right, so "Draft" button is never cut off
+        undraftedContainer = document.getElementById("undrafted").parentNode;
+        undraftedContainer.scrollLeft = undraftedContainer.scrollWidth;
+
+        ui.tableClickableRows($("#undrafted"));
+        ui.tableClickableRows($("#drafted"));
+
+        // If this is a fantasy draft, make everybody use two screens to save space
+        if (g.phase === g.PHASE.FANTASY_DRAFT) {
+            $("#undrafted-col").removeClass("col-sm-6").addClass("col-xs-12");
+            $("#drafted-col").removeClass("col-sm-6").addClass("col-xs-12");
+
+            $(".row-offcanvas").addClass("row-offcanvas-force");
+            $(".row-offcanvas-right").addClass("row-offcanvas-right-force");
+            $(".sidebar-offcanvas").addClass("sidebar-offcanvas-force");
+
+            $("#view-drafted").removeClass("visible-xs");
+            $("#view-undrafted").removeClass("visible-xs");
+        }
     }
 
     return bbgmView.init({

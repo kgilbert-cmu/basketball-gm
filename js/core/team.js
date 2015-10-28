@@ -2,12 +2,12 @@
  * @name core.team
  * @namespace Functions operating on team objects, parts of team objects, or arrays of team objects.
  */
-define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/random"], function (db, g, player, _, helpers, random) {
+define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, player, Promise, _, eventLog, helpers, random) {
     "use strict";
 
     /**
      * Add a new row of season attributes to a team object.
-     * 
+     *
      * There should be one season attributes row for each year, and a new row should be added for each team at the start of a season.
      *
      * @memberOf core.team
@@ -15,14 +15,21 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
      * @return {Object} Updated team object.
      */
     function addSeasonRow(t) {
-        var key, newSeason, s;
+        var newSeason, s;
 
-        s = t.seasons.length - 1; // Most recent ratings
+        s = t.seasons.length - 1; // Most recent season
+
+        // Make sure this isn't a duplicate season
+        if (s >= 0 && t.seasons[s].season === g.season) {
+            console.log("Attempting to add duplicate team season record!");
+            return t;
+        }
 
         // Initial entry
         newSeason = {
             season: g.season,
             gp: 0,
+            gpHome: 0,
             att: 0,
             cash: 10000,
             won: 0,
@@ -118,7 +125,7 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
 
     /**
      * Add a new row of stats to a team object.
-     * 
+     *
      * A row contains stats for unique values of (season, playoffs). So new rows need to be added when a new season starts or when a team makes the playoffs.
      *
      * @memberOf core.team
@@ -127,9 +134,16 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
      * @return {Object} Updated team object.
      */
     function addStatsRow(t, playoffs) {
-        var key, newStats;
+        var i;
 
         playoffs = playoffs !== undefined ? playoffs : false;
+
+        // If there is already an entry for this season+playoffs, do nothing
+        for (i = 0; i < t.stats.length; i++) {
+            if (t.stats[i].season === g.season && t.stats[i].playoffs === playoffs) {
+                return t;
+            }
+        }
 
         t.stats.push({
             season: g.season,
@@ -155,6 +169,7 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
             tov: 0,
             stl: 0,
             blk: 0,
+            ba: 0,
             pf: 0,
             pts: 0,
             oppPts: 0
@@ -165,13 +180,19 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
 
     /**
      * Create a new team object.
-     * 
+     *
      * @memberOf core.team
-     * @param {Object} tm Team metadata object, likely from util.helpers.getTeams.
+     * @param {Object} tm Team metadata object, likely from core.league.create.
      * @return {Object} Team object to insert in the database.
      */
     function generate(tm) {
-        var t;
+        var strategy, t;
+
+        if (tm.hasOwnProperty("strategy")) {
+            strategy = tm.strategy;
+        } else {
+            strategy = Math.random() > 0.5 ? "contending" : "rebuilding";
+        }
 
         t = {
             tid: tm.tid,
@@ -180,112 +201,287 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
             region: tm.region,
             name: tm.name,
             abbrev: tm.abbrev,
-            stats: [],
-            seasons: [],
+            imgURL: tm.imgURL !== undefined ? tm.imgURL : "",
+            stats: tm.hasOwnProperty("stats") ? tm.stats : [],
+            seasons: tm.hasOwnProperty("seasons") ? tm.seasons : [],
             budget: {
                 ticketPrice: {
-                    amount: helpers.round(25 + 25 * (30 - tm.popRank) / 29, 2),
-                    rank: tm.popRank
+                    amount: tm.hasOwnProperty("budget") ? tm.budget.ticketPrice.amount : helpers.round(25 + 25 * (g.numTeams - tm.popRank) / (g.numTeams - 1), 2),
+                    rank: tm.hasOwnProperty("budget") ? tm.budget.ticketPrice.rank : tm.popRank
                 },
                 scouting: {
-                    amount: helpers.round(900 + 900 * (30 - tm.popRank) / 29) * 10,
-                    rank: tm.popRank
+                    amount: tm.hasOwnProperty("budget") ? tm.budget.scouting.amount : helpers.round(900 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                    rank: tm.hasOwnProperty("budget") ? tm.budget.scouting.rank : tm.popRank
                 },
                 coaching: {
-                    amount: helpers.round(900 + 900 * (30 - tm.popRank) / 29) * 10,
-                    rank: tm.popRank
+                    amount: tm.hasOwnProperty("budget") ? tm.budget.coaching.amount : helpers.round(900 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                    rank: tm.hasOwnProperty("budget") ? tm.budget.coaching.rank : tm.popRank
                 },
                 health: {
-                    amount: helpers.round(900 + 900 * (30 - tm.popRank) / 29) * 10,
-                    rank: tm.popRank
+                    amount: tm.hasOwnProperty("budget") ? tm.budget.health.amount : helpers.round(900 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                    rank: tm.hasOwnProperty("budget") ? tm.budget.health.rank : tm.popRank
                 },
                 facilities: {
-                    amount: helpers.round(900 + 900 * (30 - tm.popRank) / 29) * 10,
-                    rank: tm.popRank
+                    amount: tm.hasOwnProperty("budget") ? tm.budget.facilities.amount : helpers.round(900 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                    rank: tm.hasOwnProperty("budget") ? tm.budget.facilities.rank : tm.popRank
                 }
             },
-            strategy: Math.random() > 0.5 ? "contending" : "rebuilding"
+            strategy: strategy
         };
 
-        t = addSeasonRow(t);
-        t = addStatsRow(t);
-
-        t.seasons[0].pop = tm.pop;
+        if (!tm.hasOwnProperty("seasons")) {
+            t = addSeasonRow(t);
+            t.seasons[0].pop = tm.pop;
+        }
+        if (!tm.hasOwnProperty("stats")) {
+            t = addStatsRow(t);
+        }
 
         return t;
     }
 
     /**
-     * Sort a team's roster based on player ratings.
+     * Given a list of players sorted by ability, find the starters.
      *
-     * If ot is null, then the callback will run only after the transaction finishes (i.e. only after the updated roster order is actually saved to the database). If ot is not null, then the callback might run earlier, so don't rely on the updated roster order actually being in the database yet.
      *
-     * So, ot should NOT be null if you're sorting multiple roster as a component of some larger operation, but the results of the sorts don't actually matter. ot should be null if you need to ensure that the roster order is updated before you do something that will read the roster order (like updating the UI).
-     * 
-     * @memberOf core.team
-     * @param {(IDBObjectStore|IDBTransaction|null)} ot An IndexedDB object store or transaction on players readwrite; if null is passed, then a new transaction will be used.
-     * @param {number} tid Team ID.
-     * @param {function()=} cb Optional callback.
+     * @param  {[type]} players [description]
+     * @param {Array.<string>} p Array positions of players on roster, sorted by value already.
+     * @return {Array.<number>} Indexes of the starters from the input array. If this is of length < 5, then satisfactory starters couldn't be found and any players should be used to fill in the starting lineup.
      */
-    function rosterAutoSort(ot, tid, cb) {
-        var players, playerStore, tx;
+    function findStarters(positions) {
+        var i, numC, numFC, numG, starters;
 
-        tx = db.getObjectStore(ot, "players", null, true);
-        playerStore = tx.objectStore("players");
+        starters = []; // Will be less than 5 in length if that's all it takes to meet requirements
+        numG = 0;
+        numFC = 0;
+        numC = 0;
+        for (i = 0; i < positions.length; i++) {
+            if (starters.length === 5 || (numG >= 2 && numFC >= 2)) { break; }
 
-        // Get roster and sort by overall rating
-        playerStore.index("tid").getAll(tid).onsuccess = function (event) {
-            var i;
+            // Make sure we can get 2 G and 2 F/C
+            if ((5 - starters.length > ((2 - numG) > 0 ? (2 - numG) : 0) + ((2 - numFC) > 0 ? (2 - numFC) : 0)) ||
+                    (numG < 2 && positions[i].indexOf('G') >= 0) ||
+                    (numFC < 2 && (positions[i].indexOf('F') >= 0 || (positions[i] === 'C' && numC === 0)))) {
+                starters.push(i);
+                numG += positions[i].indexOf('G') >= 0 ? 1 : 0;
+                numFC += (positions[i].indexOf('F') >= 0 || positions[i] === 'C') ? 1 : 0;
+                numC += positions[i] === 'C' ? 1 : 0;
+            }
+        }
 
-            players = player.filter(event.target.result, {
-                attrs: ["pid"],
-                ratings: ["ovr"],
+        // Fill in after meeting requirements, but still not too many Cs!
+        for (i = 0; i < positions.length; i++) {
+            if (starters.length === 5) { break; }
+            if (starters.indexOf(i) >= 0) { continue; }
+            if (numC >= 1 && positions[i] === 'c') { continue; }
+
+            starters.push(i);
+            numC += positions[i] === 'C' ? 1 : 0;
+        }
+
+        return starters;
+    }
+
+    /**
+     * Sort a team's roster based on player ratings and stats.
+     *
+     * @memberOf core.team
+     * @param {IDBTransaction|null} tx An IndexedDB transaction on players readwrite; if null is passed, then a new transaction will be used.
+     * @param {number} tid Team ID.
+     * @return {Promise}
+     */
+    function rosterAutoSort(tx, tid) {
+        if (tx === null) {
+            tx = dao.tx("players", "readwrite");
+        }
+
+        // Get roster and sort by value (no potential included)
+        return dao.players.getAll({
+            ot: tx,
+            index: "tid",
+            key: tid
+        }).then(function (players) {
+            var i, newPlayers, positions, starters;
+
+            players = player.filter(players, {
+                attrs: ["pid", "valueNoPot", "valueNoPotFuzz"],
+                ratings: ["pos"],
                 season: g.season,
-                tid: tid,
                 showNoStats: true,
-                showRookies: true,
-                fuzz: tid === g.userTid
+                showRookies: true
             });
-            players.sort(function (a, b) {  return b.ratings.ovr - a.ratings.ovr; });
+            // Fuzz only for user's team
+            if (tid === g.userTid) {
+                players.sort(function (a, b) { return b.valueNoPotFuzz - a.valueNoPotFuzz; });
+            } else {
+                players.sort(function (a, b) { return b.valueNoPot - a.valueNoPot; });
+            }
+
+            // Shuffle array so that position conditions are met - 2 G and 2 F/C in starting lineup, at most one pure C
+            positions = players.map(function (p) {
+                return p.ratings.pos;
+            });
+            starters = findStarters(positions);
+            newPlayers = starters.map(function (i) {
+                return players[i];
+            });
+            for (i = 0; i < players.length; i++) {
+                if (starters.indexOf(i) < 0) {
+                    newPlayers.push(players[i]);
+                }
+            }
+            players = newPlayers;
 
             for (i = 0; i < players.length; i++) {
                 players[i].rosterOrder = i;
             }
 
             // Update rosterOrder
-            playerStore.index("tid").openCursor(tid).onsuccess = function (event) {
-                var cursor, i, p;
+            return dao.players.iterate({
+                ot: tx,
+                index: "tid",
+                key: tid,
+                callback: function (p) {
+                    var i;
 
-                cursor = event.target.result;
-                if (cursor) {
-                    p = cursor.value;
                     for (i = 0; i < players.length; i++) {
                         if (players[i].pid === p.pid) {
-                            p.rosterOrder = players[i].rosterOrder;
+                            if (p.rosterOrder !== players[i].rosterOrder) {
+                                // Only write to DB if this actually changes
+                                p.rosterOrder = players[i].rosterOrder;
+                                return p;
+                            }
                             break;
                         }
                     }
-                    cursor.update(p);
-                    cursor.continue();
                 }
-            };
+            });
+        });
+    }
 
-            if (ot !== null) {
-                // This function doesn't have its own transaction, so we need to call the callback now even though the update might not have been processed yet.
-                if (cb !== undefined) {
-                    cb();
-                }
+    /**
+    * Gets all the contracts a team owes.
+    *
+    * This includes contracts for players who have been released but are still owed money.
+    *
+    * @memberOf core.team
+    * @param {IDBTransaction|null} tx An IndexedDB transaction on players and releasedPlayers; if null is passed, then a new transaction will be used.
+    * @param {number} tid Team ID.
+    * @returns {Promise.Array} Array of objects containing contract information.
+    */
+    function getContracts(tx, tid) {
+        var contracts;
+
+        tx = dao.tx(["players", "releasedPlayers"], "readonly", tx);
+
+        // First, get players currently on the roster
+        return dao.players.getAll({
+            ot: tx,
+            index: "tid",
+            key: tid
+        }).then(function (players) {
+            var i;
+
+            contracts = [];
+            for (i = 0; i < players.length; i++) {
+                contracts.push({
+                    pid: players[i].pid,
+                    name: players[i].name,
+                    skills: players[i].ratings[players[i].ratings.length - 1].skills,
+                    injury: players[i].injury,
+                    watch: players[i].watch !== undefined ? players[i].watch : false, // undefined check is for old leagues, can delete eventually
+                    amount: players[i].contract.amount,
+                    exp: players[i].contract.exp,
+                    released: false
+                });
             }
-        };
 
-        if (ot === null) {
-            // This function has its own transaction, so wait until it finishes before calling the callback.
-            tx.oncomplete = function () {
-                if (cb !== undefined) {
-                    cb();
-                }
-            };
+            // Then, get any released players still owed money
+            return dao.releasedPlayers.getAll({
+                ot: tx,
+                index: "tid",
+                key: tid
+            });
+        }).then(function (releasedPlayers) {
+            if (releasedPlayers.length === 0) {
+                return contracts;
+            }
+
+            return Promise.each(releasedPlayers, function (releasedPlayer) {
+                return dao.players.get({
+                    ot: tx,
+                    key: releasedPlayer.pid
+                }).then(function (p) {
+                    if (p !== undefined) { // If a player is deleted, such as if the user deletes retired players to improve performance, this will be undefined
+                        contracts.push({
+                            pid: releasedPlayer.pid,
+                            name: p.name,
+                            skills: p.ratings[p.ratings.length - 1].skills,
+                            injury: p.injury,
+                            amount: releasedPlayer.contract.amount,
+                            exp: releasedPlayer.contract.exp,
+                            released: true
+                        });
+                    } else {
+                        contracts.push({
+                            pid: releasedPlayer.pid,
+                            name: "Deleted Player",
+                            skills: [],
+                            amount: releasedPlayer.contract.amount,
+                            exp: releasedPlayer.contract.exp,
+                            released: true
+                        });
+                    }
+                });
+            }).then(function () {
+                return contracts;
+            });
+        });
+    }
+
+    /**
+     * Get the total current payroll for a team.
+     *
+     * This includes players who have been released but are still owed money from their old contracts.
+     *
+     * @memberOf core.team
+     * @param {IDBTransaction|null} tx An IndexedDB transaction on players and releasedPlayers; if null is passed, then a new transaction will be used.
+     * @param {number} tid Team ID.
+     * @return {Promise.<number, Array=>} Resolves to an array; first argument is the payroll in thousands of dollars, second argument is the array of contract objects from dao.contracts.getAll.
+     */
+    function getPayroll(tx, tid) {
+        tx = dao.tx(["players", "releasedPlayers"], "readonly", tx);
+
+        return getContracts(tx, tid).then(function (contracts) {
+            var i, payroll;
+
+            payroll = 0;
+            for (i = 0; i < contracts.length; i++) {
+                payroll += contracts[i].amount;  // No need to check exp, since anyone without a contract for the current season will not have an entry
+            }
+
+            return [payroll, contracts];
+        });
+    }
+
+    /**
+     * Get the total current payroll for every team team.
+     *
+     * @memberOf core.team
+     * @param {IDBTransaction|null} ot An IndexedDB transaction on players and releasedPlayers; if null is passed, then a new transaction will be used.
+     * @return {Promise} Resolves to an array of payrolls, ordered by team id.
+     */
+    function getPayrolls(tx) {
+        var promises, tid;
+
+        tx = dao.tx(["players", "releasedPlayers"], "readonly", tx);
+
+        promises = [];
+        for (tid = 0; tid < g.numTeams; tid++) {
+            promises.push(getPayroll(tx, tid).get(0));
         }
+
+        return Promise.all(promises);
     }
 
     /**
@@ -294,11 +490,11 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
      * This can be used to retrieve information about a certain season, compute average statistics from the raw data, etc.
      *
      * This is similar to player.filter, but has some differences. If only one season is requested, the attrs, seasonAttrs, and stats properties will all be merged on the root filtered team object for each team. "stats" is broken out into its own property only when multiple seasons are requested (options.season is undefined). "seasonAttrs" should behave similarly, but it currently doesn't because it just hasn't been used that way anywhere yet.
-     * 
+     *
      * @memberOf core.team
      * @param {Object} options Options, as described below.
      * @param {number=} options.season Season to retrieve stats/ratings for. If undefined, return stats for all seasons in a list called "stats".
-     * @param {number=} options.tid Team ID. Set this if you want to return only one team object. If undefined, an array of all teams is returned.
+     * @param {number=} options.tid Team ID. Set this if you want to return only one team object. If undefined, an array of all teams is returned, ordered by tid by default.
      * @param {Array.<string>=} options.attrs List of team attributes to include in output (e.g. region, abbrev, name, ...).
      * @param {Array.<string>=} options.seasonAttrs List of seasonal team attributes to include in output (e.g. won, lost, payroll, ...).
      * @param {Array.<string=>} options.stats List of team stats to include in output (e.g. fg, orb, ast, blk, ...).
@@ -306,10 +502,12 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
      * @param {boolean=} options.playoffs Boolean representing whether to return playoff stats or not; default is false. Unlike player.filter, team.filter returns either playoff stats or regular season stats, never both.
      * @param {string=} options.sortby Sorting method. "winp" sorts by descending winning percentage. If undefined, then teams are returned in order of their team IDs (which is alphabetical, currently).
      * @param {IDBTransaction|null=} options.ot An IndexedDB transaction on players, releasedPlayers, and teams; if null/undefined, then a new transaction will be used.
-     * @param {function(Object|Array.<Object>)} cb Callback function called with filtered team object or array of filtered team objects, depending on the inputs.
+     * @return {Promise.(Object|Array.<Object>)} Filtered team object or array of filtered team objects, depending on the inputs.
      */
-    function filter(options, cb) {
-        var filterAttrs, filterSeasonAttrs, filterStats, filterStatsPartial, tx;
+    function filter(options) {
+        var filterAttrs, filterSeasonAttrs, filterStats, filterStatsPartial;
+
+        if (arguments[1] !== undefined) { throw new Error("No cb should be here"); }
 
         options = options !== undefined ? options : {};
         options.season = options.season !== undefined ? options.season : null;
@@ -351,6 +549,11 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                     }
                 }
 
+                // For cases when the deleteOldData feature is used
+                if (tsa === undefined) {
+                    return;
+                }
+
                 // Revenue and expenses calculation
                 tsa.revenue = _.reduce(tsa.revenues, function (memo, revenue) { return memo + revenue.amount; }, 0);
                 tsa.expense = _.reduce(tsa.expenses, function (memo, expense) { return memo + expense.amount; }, 0);
@@ -363,8 +566,9 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                         }
                     } else if (options.seasonAttrs[j] === "att") {
                         ft.att = 0;
-                        if (tsa.gp > 0) {
-                            ft.att = tsa.att / tsa.gp;
+                        if (!tsa.hasOwnProperty("gpHome")) { tsa.gpHome = Math.round(tsa.gp / 2); } // See also game.js and teamFinances.js
+                        if (tsa.gpHome > 0) {
+                            ft.att = tsa.att / tsa.gpHome;
                         }
                     } else if (options.seasonAttrs[j] === "cash") {
                         ft.cash = tsa.cash / 1000;  // [millions of dollars]
@@ -388,18 +592,6 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                             ft.streak = "Won " + tsa.streak;
                         } else if (tsa.streak < 0) {
                             ft.streak = "Lost " + Math.abs(tsa.streak);
-                        }
-                    } else if (options.seasonAttrs[j] === "streakLong") {  // For dashboard
-                        if (tsa.streak === 0) {
-                            ft.streakLong = null;
-                        } else if (tsa.streak === 1) {
-                            ft.streakLong = "won last game";
-                        } else if (tsa.streak > 1) {
-                            ft.streakLong = "won last " + tsa.streak + " games";
-                        } else if (tsa.streak === -1) {
-                            ft.streakLong = "lost last game";
-                        } else if (tsa.streak < -1) {
-                            ft.streakLong = "lost last " + Math.abs(tsa.streak) + " games";
                         }
                     } else {
                         ft[options.seasonAttrs[j]] = tsa[options.seasonAttrs[j]];
@@ -452,6 +644,8 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                         } else {
                             ft.ftp = 0;
                         }
+                    } else if (stats[j] === "diff") {
+                        ft.diff = ft.pts - ft.oppPts;
                     } else if (stats[j] === "season") {
                         ft.season = s.season;
                     } else {
@@ -511,13 +705,10 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
             }
         };
 
-        tx = db.getObjectStore(options.ot, ["players", "releasedPlayers", "teams"], null);
-        tx.objectStore("teams").getAll(options.tid).onsuccess = function (event) {
-            var ft, fts, i, returnOneTeam, savePayroll, t;
+        return dao.teams.getAll({ot: options.ot, key: options.tid}).then(function (t) {
+            var ft, fts, i, returnOneTeam, savePayroll, sortBy;
 
-            t = event.target.result;
-
-            // t will be an array of 30 teams (if options.tid is null) or an array of 1 team. If 1, then we want to return just that team object at the end, not an array of 1 team.
+            // t will be an array of g.numTeams teams (if options.tid is null) or an array of 1 team. If 1, then we want to return just that team object at the end, not an array of 1 team.
             returnOneTeam = false;
             if (t.length === 1) {
                 returnOneTeam = true;
@@ -533,191 +724,330 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                 fts.push(ft);
             }
 
-            if (options.sortBy === "winp") {
+            if (Array.isArray(options.sortBy)) {
+                // Sort by multiple properties
+                sortBy = options.sortBy.slice();
+                fts.sort(function (a, b) {
+                    var result;
+
+                    for (i = 0; i < sortBy.length; i++) {
+                        result = (sortBy[i].indexOf("-") === 1) ? a[sortBy[i]] - b[sortBy[i]] : b[sortBy[i]] - a[sortBy[i]];
+
+                        if (result || i === sortBy.length - 1) {
+                            return result;
+                        }
+                    }
+                });
+            } else if (options.sortBy === "winp") {
                 // Sort by winning percentage, descending
-                fts.sort(function (a, b) {  return b.winp - a.winp; });
+                fts.sort(function (a, b) { return b.winp - a.winp; });
             }
 
             // If payroll for the current season was requested, find the current payroll for each team. Otherwise, don't.
             if (options.seasonAttrs.indexOf("payroll") < 0 || options.season !== g.season) {
-                cb(returnOneTeam ? fts[0] : fts);
-            } else {
-                savePayroll = function (i) {
-                    db.getPayroll(options.ot, t[i].tid, function (payroll) {
-                        fts[i].payroll = payroll / 1000;
-                        if (i === fts.length - 1) {
-                            cb(returnOneTeam ? fts[0] : fts);
-                        } else {
-                            savePayroll(i + 1);
-                        }
-                    });
-                };
-                savePayroll(0);
+                return returnOneTeam ? fts[0] : fts;
             }
-        };
+
+            savePayroll = function (i) {
+                return getPayroll(options.ot, t[i].tid).get(0).then(function (payroll) {
+                    fts[i].payroll = payroll / 1000;
+                    if (i === fts.length - 1) {
+                        return returnOneTeam ? fts[0] : fts;
+                    }
+
+                    return savePayroll(i + 1);
+                });
+            };
+            return savePayroll(0);
+        });
     }
 
-    function valueChange(tid, pidsAdd, pidsRemove, dpidsAdd, dpidsRemove, cb) {
-        var add, i, remove, roster, strategy, tx;
+    // estValuesCached is either a copy of estValues (defined below) or null. When it's cached, it's much faster for repeated calls (like trading block).
+    function valueChange(tid, pidsAdd, pidsRemove, dpidsAdd, dpidsRemove, estValuesCached) {
+        var add, getPicks, getPlayers, gpAvg, payroll, pop, remove, roster, strategy, tx;
+
+        // UGLY HACK: Don't include more than 2 draft picks in a trade for AI team
+        if (dpidsRemove.length > 2) {
+            return Promise.resolve(-1);
+        }
 
         // Get value and skills for each player on team or involved in the proposed transaction
         roster = [];
         add = [];
         remove = [];
 
-        tx = g.dbl.transaction(["draftPicks", "players", "teams"]);
-
-        // Get team strategy, for future use
-        tx.objectStore("teams").get(tid).onsuccess = function (event) {
-            strategy = event.target.result.strategy;
-        };
+        tx = dao.tx(["draftPicks", "players", "releasedPlayers", "teams"]);
 
         // Get players
-        tx.objectStore("players").index("tid").openCursor(tid).onsuccess = function (event) {
-            var cursor, p;
+        getPlayers = function () {
+            var fudgeFactor, i;
 
-            cursor = event.target.result;
-            if (cursor) {
-                p = cursor.value;
+            // Fudge factor for AI overvaluing its own players
+            if (tid !== g.userTid) {
+                fudgeFactor = 1.05;
+            } else {
+                fudgeFactor = 1;
+            }
 
-                if (pidsRemove.indexOf(p.pid) < 0) {
-                    roster.push({
-                        value: player.value(p),
-                        skills: _.last(p.ratings).skills,
-                        contractAmount: p.contract.amount / 1000,
-                        age: g.season - p.born.year
-                    });
-                } else {
-                    remove.push({
-                        value: player.value(p),
-                        skills: _.last(p.ratings).skills,
-                        contractAmount: p.contract.amount / 1000,
-                        age: g.season - p.born.year
-                    });
+            // Get roster and players to remove
+            dao.players.getAll({
+                ot: tx,
+                index: "tid",
+                key: tid
+            }).then(function (players) {
+                var i, p;
+
+                for (i = 0; i < players.length; i++) {
+                    p = players[i];
+
+                    if (pidsRemove.indexOf(p.pid) < 0) {
+                        roster.push({
+                            value: p.value,
+                            skills: _.last(p.ratings).skills,
+                            contract: p.contract,
+                            worth: player.genContract(p, false, false, true),
+                            injury: p.injury,
+                            age: g.season - p.born.year
+                        });
+                    } else {
+                        remove.push({
+                            value: p.value * fudgeFactor,
+                            skills: _.last(p.ratings).skills,
+                            contract: p.contract,
+                            worth: player.genContract(p, false, false, true),
+                            injury: p.injury,
+                            age: g.season - p.born.year
+                        });
+                    }
                 }
+            });
 
-                cursor.continue();
+            // Get players to add
+            for (i = 0; i < pidsAdd.length; i++) {
+                dao.players.get({
+                    ot: tx,
+                    key: pidsAdd[i]
+                }).then(function (p) {
+                    add.push({
+                        value: p.valueWithContract,
+                        skills: _.last(p.ratings).skills,
+                        contract: p.contract,
+                        worth: player.genContract(p, false, false, true),
+                        injury: p.injury,
+                        age: g.season - p.born.year
+                    });
+                });
             }
         };
-        for (i = 0; i < pidsAdd.length; i++) {
-            tx.objectStore("players").get(pidsAdd[i]).onsuccess = function (event) {
-                var p;
 
-                p = event.target.result;
+        getPicks = function () {
+            // For each draft pick, estimate its value based on the recent performance of the team
+            if (dpidsAdd.length > 0 || dpidsRemove.length > 0) {
+                // Estimate the order of the picks by team
+                dao.teams.getAll({ot: tx}).then(function (teams) {
+                    var estPicks, estValues, gp, i, rCurrent, rLast, rookieSalaries, s, sorted, t, withEstValues, wps;
 
-                add.push({
-                    value: player.value(p),
-                    skills: _.last(p.ratings).skills,
-                    contractAmount: p.contract.amount / 1000,
-                    age: g.season - p.born.year
-                });
-            };
-        }
-
-        // For each draft pick, estimate its value based on the recent performance of the team
-        if (dpidsAdd.length > 0 || dpidsRemove.length > 0) {
-            // Estimate the order of the picks by team
-            tx.objectStore("teams").getAll().onsuccess = function (event) {
-                var estPicks, estValues, gp, i, rCurrent, rLast, rookieSalaries, s, sorted, t, teams, wps;
-
-                teams = event.target.result;
-
-                wps = []; // Contains estimated winning percentages for all teams by the end of the season
-                for (i = 0; i < teams.length; i++) {
-                    t = teams[i];
-                    if (t.seasons.length === 1) {
-                        // First season
-                        if (t.seasons[0].won + t.seasons[0].lost > 15) {
-                            rCurrent = [t.seasons[0].won, t.seasons[0].lost];
-                        } else {
-                            // Fix for new leagues - don't base this on record until we have some games played, and don't let the user's picks be overvalued
-                            if (i === g.userTid) {
-                                rCurrent = [82, 0];
-                            } else {
-                                rCurrent = [0, 82];
-                            }
-                        }
-                        if (i === g.userTid) {
-                            rLast = [50, 32];
-                        } else {
-                            rLast = [32, 50]; // Assume a losing season to minimize bad trades
-                        }
-                    } else {
-                        // Second (or higher) season
+                    // This part needs to be run every time so that gpAvg is available
+                    wps = []; // Contains estimated winning percentages for all teams by the end of the season
+                    for (i = 0; i < teams.length; i++) {
+                        t = teams[i];
                         s = t.seasons.length;
-                        rCurrent = [t.seasons[s - 1].won, t.seasons[s - 1].lost];
-                        rLast = [t.seasons[s - 2].won, t.seasons[s - 2].lost];
+                        if (t.seasons.length === 1) {
+                            // First season
+                            if (t.seasons[0].won + t.seasons[0].lost > 15) {
+                                rCurrent = [t.seasons[0].won, t.seasons[0].lost];
+                            } else {
+                                // Fix for new leagues - don't base this on record until we have some games played, and don't let the user's picks be overvalued
+                                if (i === g.userTid) {
+                                    rCurrent = [82, 0];
+                                } else {
+                                    rCurrent = [0, 82];
+                                }
+                            }
+                            if (i === g.userTid) {
+                                rLast = [50, 32];
+                            } else {
+                                rLast = [32, 50]; // Assume a losing season to minimize bad trades
+                            }
+                        } else {
+                            // Second (or higher) season
+                            rCurrent = [t.seasons[s - 1].won, t.seasons[s - 1].lost];
+                            rLast = [t.seasons[s - 2].won, t.seasons[s - 2].lost];
+                        }
+
+                        gp = rCurrent[0] + rCurrent[1]; // Might not be "real" games played
+
+                        // If we've played half a season, just use that as an estimate. Otherwise, take a weighted sum of this and last year
+                        if (gp >= 41) {
+                            wps.push(rCurrent[0] / gp);
+                        } else if (gp > 0) {
+                            wps.push((gp / 41 * rCurrent[0] / gp + (41 - gp) / 41 * rLast[0] / 82));
+                        } else {
+                            wps.push(rLast[0] / 82);
+                        }
                     }
 
-                    gp = rCurrent[0] + rCurrent[1];
+                    // Get rank order of wps http://stackoverflow.com/a/14834599/786644
+                    sorted = wps.slice().sort(function (a, b) { return a - b; });
+                    estPicks = wps.slice().map(function (v) { return sorted.indexOf(v) + 1; }); // For each team, what is their estimated draft position?
 
-                    // If we've played half a season, just use that as an estimate. Otherwise, take a weighted sum of this and last year
-                    if (gp >= 41) {
-                        wps.push(rCurrent[0] / gp);
-                    } else if (gp > 0) {
-                        wps.push((gp / 41 * rCurrent[0] / gp + (41 - gp) / 41 * rLast[0] / 82));
+                    rookieSalaries = require("core/draft").getRookieSalaries();
+
+                    // Actually add picks after some stuff below is done
+                    withEstValues = function () {
+                        var i;
+
+                        for (i = 0; i < dpidsAdd.length; i++) {
+                            dao.draftPicks.get({ot: tx, key: dpidsAdd[i]}).then(function (dp) {
+                                var estPick, seasons, value;
+
+                                estPick = estPicks[dp.originalTid];
+
+                                // For future draft picks, add some uncertainty
+                                seasons = dp.season - g.season;
+                                estPick = Math.round(estPick * (5 - seasons) / 5 + 15 * seasons / 5);
+
+                                // No fudge factor, since this is coming from the user's team (or eventually, another AI)
+                                if (estValues[dp.season]) {
+                                    value = estValues[dp.season][estPick - 1 + g.numTeams * (dp.round - 1)];
+                                }
+                                if (!value) {
+                                    value = estValues.default[estPick - 1 + g.numTeams * (dp.round - 1)];
+                                }
+
+                                add.push({
+                                    value: value,
+                                    skills: [],
+                                    contract: {
+                                        amount: rookieSalaries[estPick - 1 + g.numTeams * (dp.round - 1)],
+                                        exp: dp.season + 2 + (2 - dp.round) // 3 for first round, 2 for second
+                                    },
+                                    worth: {
+                                        amount: rookieSalaries[estPick - 1 + g.numTeams * (dp.round - 1)],
+                                        exp: dp.season + 2 + (2 - dp.round) // 3 for first round, 2 for second
+                                    },
+                                    injury: {type: "Healthy", gamesRemaining: 0},
+                                    age: 19,
+                                    draftPick: true
+                                });
+                            });
+                        }
+
+                        for (i = 0; i < dpidsRemove.length; i++) {
+                            dao.draftPicks.get({ot: tx, key: dpidsRemove[i]}).then(function (dp) {
+                                var estPick, fudgeFactor, seasons, value;
+
+                                estPick = estPicks[dp.originalTid];
+
+                                // For future draft picks, add some uncertainty
+                                seasons = dp.season - g.season;
+                                estPick = Math.round(estPick * (5 - seasons) / 5 + 15 * seasons / 5);
+
+                                // Set fudge factor with more confidence if it's the current season
+                                if (seasons === 0 && gp >= 41) {
+                                    fudgeFactor = (1 - gp / 82) * 5;
+                                } else {
+                                    fudgeFactor = 5;
+                                }
+
+                                // Use fudge factor: AI teams like their own picks
+                                if (estValues[dp.season]) {
+                                    value = estValues[dp.season][estPick - 1 + g.numTeams * (dp.round - 1)] + (tid !== g.userTid) * fudgeFactor;
+                                }
+                                if (!value) {
+                                    value = estValues.default[estPick - 1 + g.numTeams * (dp.round - 1)] + (tid !== g.userTid) * fudgeFactor;
+                                }
+
+                                remove.push({
+                                    value: value,
+                                    skills: [],
+                                    contract: {
+                                        amount: rookieSalaries[estPick - 1 + g.numTeams * (dp.round - 1)] / 1000,
+                                        exp: dp.season + 2 + (2 - dp.round) // 3 for first round, 2 for second
+                                    },
+                                    worth: {
+                                        amount: rookieSalaries[estPick - 1 + g.numTeams * (dp.round - 1)] / 1000,
+                                        exp: dp.season + 2 + (2 - dp.round) // 3 for first round, 2 for second
+                                    },
+                                    injury: {type: "Healthy", gamesRemaining: 0},
+                                    age: 19,
+                                    draftPick: true
+                                });
+                            });
+                        }
+                    };
+
+                    if (estValuesCached) {
+                        estValues = estValuesCached;
+                        withEstValues();
                     } else {
-                        wps.push(rLast[0] / 82);
-                    }
-                }
-
-                // Get rank order of wps http://stackoverflow.com/a/14834599/786644
-                sorted = wps.slice().sort(function (a, b) { return a - b; });
-                estPicks = wps.slice().map(function (v) { return sorted.indexOf(v) + 1; }); // For each team, what is their estimated draft position?
-
-                // Not needed because of rCurrent override above
-                /*// Fix for new leagues - don't base this on record until we have some games played, and don't let the user's picks be overvalued
-                if (gp < 10 && t.seasons.length == 1) {
-                    for (i = 0; i < estPicks.length; i++) {
-                        estPicks[i] = 5;
-                    }
-                }*/
-
-                rookieSalaries = [5000, 4500, 4000, 3500, 3000, 2750, 2500, 2250, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]; // Keep in sync with core.draft
-                estValues = [75, 73, 71, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 50, 50, 49, 49, 49, 48, 48, 48, 47, 47, 47, 46, 46, 46, 45, 45, 45, 44, 44, 44, 43, 43, 43, 42, 42, 42, 41, 41, 41, 40, 40, 39, 39, 38, 38, 37, 37]; // This is basically arbitrary
-
-                for (i = 0; i < dpidsAdd.length; i++) {
-                    tx.objectStore("draftPicks").get(dpidsAdd[i]).onsuccess = function (event) {
-                        var dp, estPick, seasons;
-
-                        dp = event.target.result;
-                        estPick = estPicks[dp.originalTid];
-                        seasons = dp.season - g.season;
-                        estPick = Math.round(estPick * (5 - seasons) / 5 + 15 * seasons / 5);
-
-                        add.push({
-                            value: estValues[estPick - 1 + 30 * (dp.round - 1)],
-                            skills: [],
-                            contractAmount: rookieSalaries[estPick - 1 + 30 * (dp.round - 1)] / 1000,
-                            age: 19,
-                            draftPick: true
+                        require("core/trade").getPickValues(tx).then(function (newEstValues) {
+                            estValues = newEstValues;
+                            withEstValues();
                         });
-                    };
+                    }
+                });
+            }
+        };
+
+        // Get team strategy and population, for future use
+        filter({
+            attrs: ["strategy"],
+            seasonAttrs: ["pop"],
+            stats: ["gp"],
+            season: g.season,
+            tid: tid,
+            ot: tx
+        }).then(function (t) {
+            strategy = t.strategy;
+            pop = t.pop;
+            if (pop > 20) {
+                pop = 20;
+            }
+            gpAvg = t.gp; // Ideally would be done separately for each team, but close enough
+
+            getPlayers();
+            getPicks();
+        });
+
+        getPayroll(tx, tid).then(function (payrollLocal) {
+            payroll = payrollLocal;
+        });
+
+        return tx.complete().then(function () {
+            var base, contractsFactor, doSkillBonuses, dv, rosterAndAdd, rosterAndRemove, salaryAddedThisSeason, salaryRemoved, skillsNeeded, sumContracts, sumValues;
+
+            gpAvg = helpers.bound(gpAvg, 0, 82);
+
+/*            // Handle situations where the team goes over the roster size limit
+            if (roster.length + remove.length > 15) {
+                // Already over roster limit, so don't worry unless this trade actually makes it worse
+                needToDrop = (roster.length + add.length) - (roster.length + remove.length);
+            } else {
+                needToDrop = (roster.length + add.length) - 15;
+            }
+            roster.sort(function (a, b) { return a.value - b.value; }); // Sort by value, ascending
+            add.sort(function (a, b) { return a.value - b.value; }); // Sort by value, ascending
+            while (needToDrop > 0) {
+                // Find lowest value player, from roster or add. Delete him and move his salary to the second lowest value player.
+                if (roster[0].value < add[0].value) {
+                    if (roster[1].value < add[0].value) {
+                        roster[1].contract.amount += roster[0].contract.amount;
+                    } else {
+                        add[0].contract.amount += roster[0].contract.amount;
+                    }
+                    roster.shift(); // Remove from value calculation
+                } else {
+                    if (add.length > 1 && add[1].value < roster[0].value) {
+                        add[1].contract.amount += add[0].contract.amount;
+                    } else {
+                        roster[0].contract.amount += add[0].contract.amount;
+                    }
+                    add.shift(); // Remove from value calculation
                 }
 
-                for (i = 0; i < dpidsRemove.length; i++) {
-                    tx.objectStore("draftPicks").get(dpidsRemove[i]).onsuccess = function (event) {
-                        var dp, estPick, seasons;
-
-                        dp = event.target.result;
-                        estPick = estPicks[dp.originalTid];
-                        seasons = dp.season - g.season;
-                        estPick = Math.round(estPick * (5 - seasons) / 5 + 15 * seasons / 5);
-
-                        remove.push({
-                            value: estValues[estPick - 1 + 30 * (dp.round - 1)],
-                            skills: [],
-                            contractAmount: rookieSalaries[estPick - 1 + 30 * (dp.round - 1)] / 1000,
-                            age: 19,
-                            draftPick: true
-                        });
-                    };
-                }
-            };
-        }
-
-        tx.oncomplete = function () {
-            var calcDv, doSkillBonuses, dv, rosterAndAdd, rosterAndRemove, skillsNeeded;
+                needToDrop -= 1;
+            }*/
 
             // This roughly corresponds with core.gameSim.updateSynergy
             skillsNeeded = {
@@ -737,7 +1067,7 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                 // What are current skills?
                 rosterSkills = [];
                 for (i = 0; i < roster.length; i++) {
-                    if (roster.value >= 45) {
+                    if (roster[i].value >= 45) {
                         rosterSkills.push(roster[i].skills);
                     }
                 }
@@ -752,19 +1082,19 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
                         for (j = 0; j < test[i].skills.length; j++) {
                             s = test[i].skills[j];
 
-                            if (rosterSkills[s] <= skillsNeeded[s] - 2) {
+                            if (rosterSkillsCount[s] <= skillsNeeded[s] - 2) {
                                 // Big bonus
                                 test.value *= 1.1;
-                            } else if (rosterSkills[s] <= skillsNeeded[s] - 1) {
+                            } else if (rosterSkillsCount[s] <= skillsNeeded[s] - 1) {
                                 // Medium bonus
                                 test.value *= 1.05;
-                            } else if (rosterSkills[s] <= skillsNeeded[s]) {
+                            } else if (rosterSkillsCount[s] <= skillsNeeded[s]) {
                                 // Little bonus
                                 test.value *= 1.025;
                             }
 
                             // Account for redundancy in test
-                            rosterSkills[s] += 1;
+                            rosterSkillsCount[s] += 1;
                         }
                     }
                 }
@@ -778,87 +1108,177 @@ define(["db", "globals", "core/player", "lib/underscore", "util/helpers", "util/
             add = doSkillBonuses(add, rosterAndRemove);
             remove = doSkillBonuses(remove, rosterAndAdd);
 
-            // Actually calculate the change in value
-            calcDv = function (players) {
-                return _.reduce(players, function (memo, player) {
-                    var dv, factors, pop;
+            // This actually doesn't do anything because I'm an idiot
+            base = 1.25;
 
-                    // If the population of the region is larger, the contract size becomes less important. So factors.contract should increase
-                    pop = helpers.getTeams()[tid].pop;
-                    if (pop > 20) {
-                        pop = 20;
-                    }
+            sumValues = function (players, includeInjuries) {
+                var exponential;
 
-                    factors = {
-                        value: 0.3 * player.value,
-                        // This is a straight line from ($0.5, 1.4) to ($20M, 0.1) - higher second coordinate means greater value
-                        //contract: (20 - player.contractAmount) / 15 + 0.1
-                        // This takes that straight line and roughly rotates it around the middle to make it more horizontal
-                        contract: (20 - player.contractAmount) / (15 * Math.sqrt(pop)) + (-0.12 + Math.sqrt(pop) / Math.sqrt(20))
-                    };
+                includeInjuries = includeInjuries !== undefined ? includeInjuries : false;
 
-                    dv = Math.pow(3, factors.value) * factors.contract;
+                if (players.length === 0) {
+                    return 0;
+                }
+
+                exponential = _.reduce(players, function (memo, p) {
+                    var contractSeasonsRemaining, contractValue, playerValue, value;
+
+                    playerValue = p.value;
 
                     if (strategy === "rebuilding") {
                         // Value young/cheap players and draft picks more. Penalize expensive/old players
-                        if (player.draftPick) {
-                            dv *= 2;
-                        }
-                        else {
-                            if (player.age < 25 || player.contractAmount < 3) {
-                                dv *= 1.2;
-                            }
-                            if (player.contractAmount > 6) {
-                                dv -= Math.pow(3, 0.3 * 50) * player.contractAmount * 0.8;
+                        if (p.draftPick) {
+                            playerValue *= 1.15;
+                        } else {
+                            if (p.age <= 19) {
+                                playerValue *= 1.15;
+                            } else if (p.age === 20) {
+                                playerValue *= 1.1;
+                            } else if (p.age === 21) {
+                                playerValue *= 1.075;
+                            } else if (p.age === 22) {
+                                playerValue *= 1.05;
+                            } else if (p.age === 23) {
+                                playerValue *= 1.025;
+                            } else if (p.age === 27) {
+                                playerValue *= 0.975;
+                            } else if (p.age === 28) {
+                                playerValue *= 0.95;
+                            } else if (p.age >= 29) {
+                                playerValue *= 0.9;
                             }
                         }
                     }
 
-                    return memo + dv;
+                    // Anything below 45 is pretty worthless
+                    playerValue -= 45;
+
+                    // Normalize for injuries
+                    if (includeInjuries && tid !== g.userTid) {
+                        if (p.injury.gamesRemaining > 75) {
+                            playerValue -= playerValue * 0.75;
+                        } else {
+                            playerValue -= playerValue * p.injury.gamesRemaining / 100;
+                        }
+                    }
+
+                    contractValue = (p.worth.amount - p.contract.amount) / 1000;
+
+                    // Account for duration
+                    contractSeasonsRemaining = player.contractSeasonsRemaining(p.contract.exp, 82 - gpAvg);
+                    if (contractSeasonsRemaining > 1) {
+                        // Don't make it too extreme
+                        contractValue *= Math.pow(contractSeasonsRemaining, 0.25);
+                    } else {
+                        // Raising < 1 to < 1 power would make this too large
+                        contractValue *= contractSeasonsRemaining;
+                    }
+
+                    // Really bad players will just get no PT
+                    if (playerValue < 0) {
+                        playerValue = 0;
+                    }
+//console.log([playerValue, contractValue]);
+
+                    value = playerValue + 0.5 * contractValue;
+
+                    if (value === 0) {
+                        return memo;
+                    }
+                    return memo + Math.pow(Math.abs(value), base) * Math.abs(value) / value;
                 }, 0);
+
+                if (exponential === 0) {
+                    return exponential;
+                }
+                return Math.pow(Math.abs(exponential), 1 / base) * Math.abs(exponential) / exponential;
             };
 
-/*console.log('---');
-console.log(calcDv(add));
-console.log(add);
-console.log(calcDv(remove));
-console.log(remove);*/
-            dv = calcDv(add) - calcDv(remove);
+            // Sum of contracts
+            // If onlyThisSeason is set, then amounts after this season are ignored and the return value is the sum of this season's contract amounts in millions of dollars
+            sumContracts = function (players, onlyThisSeason) {
+                var sum;
 
-            // Normalize for number of players, since 1 really good player is much better than multiple mediocre ones
-            if (add.length > remove.length) {
-                dv *= Math.pow(0.95, add.length - remove.length);
+                onlyThisSeason = onlyThisSeason !== undefined ? onlyThisSeason : false;
+
+                if (players.length === 0) {
+                    return 0;
+                }
+
+                sum = _.reduce(players, function (memo, p) {
+                    if (p.draftPick) {
+                        return memo;
+                    }
+
+                    return memo + p.contract.amount / 1000 * Math.pow(player.contractSeasonsRemaining(p.contract.exp, 82 - gpAvg), 0.25 - (onlyThisSeason ? 0.25 : 0));
+                }, 0);
+
+                return sum;
+            };
+
+            if (strategy === "rebuilding") {
+                contractsFactor = 0.3;
+            } else {
+                contractsFactor = 0.1;
             }
 
-            cb(dv);
-        };
+            salaryRemoved = sumContracts(remove) - sumContracts(add);
+
+            dv = sumValues(add, true) - sumValues(remove) + contractsFactor * salaryRemoved;
+/*console.log("Added players/picks: " + sumValues(add, true));
+console.log("Removed players/picks: " + (-sumValues(remove)));
+console.log("Added contract quality: -" + contractExcessFactor + " * " + sumContractExcess(add));
+console.log("Removed contract quality: -" + contractExcessFactor + " * " + sumContractExcess(remove));
+console.log("Total contract amount: " + contractsFactor + " * " + salaryRemoved);*/
+
+            // Aversion towards losing cap space in a trade during free agency
+            if (g.phase >= g.PHASE.RESIGN_PLAYERS || g.phase <= g.PHASE.FREE_AGENCY) {
+                // Only care if cap space is over 2 million
+                if (payroll + 2000 < g.salaryCap) {
+                    salaryAddedThisSeason = sumContracts(add, true) - sumContracts(remove, true);
+                    // Only care if cap space is being used
+                    if (salaryAddedThisSeason > 0) {
+//console.log("Free agency penalty: -" + (0.2 + 0.8 * g.daysLeft / 30) * salaryAddedThisSeason);
+                        dv -= (0.2 + 0.8 * g.daysLeft / 30) * salaryAddedThisSeason; // 0.2 to 1 times the amount, depending on stage of free agency
+                    }
+                }
+            }
+
+            // Normalize for number of players, since 1 really good player is much better than multiple mediocre ones
+            // This is a fudge factor, since it's one-sided to punish the player
+            if (add.length > remove.length) {
+                dv -= add.length - remove.length;
+            }
+
+            return dv;
+/*console.log('---');
+console.log([sumValues(add), sumContracts(add)]);
+console.log([sumValues(remove), sumContracts(remove)]);
+console.log(dv);*/
+        });
     }
 
     /**
      * Update team strategies (contending or rebuilding) for every team in the league.
      *
      * Basically.. switch to rebuilding if you're old and your success is fading, and switch to contending if you have a good amount of young talent on rookie deals and your success is growing.
-     * 
+     *
      * @memberOf core.team
-     * @param {function ()} cb Callback.
+     * @param {IDBTransaction} tx An IndexedDB transaction on players, playerStats, and teams, readwrite.
+     * @return {Promise}
      */
-    function updateStrategies(cb) {
-        var tx;
-
-        // For
-        tx = g.dbl.transaction(["players", "teams"], "readwrite");
-        tx.objectStore("teams").openCursor().onsuccess = function (event) {
-            var dWon, cursor, s, t, won;
-
-            cursor = event.target.result;
-            if (cursor) {
-                t = cursor.value;
+    function updateStrategies(tx) {
+        return dao.teams.iterate({
+            ot: tx,
+            callback: function (t) {
+                var dWon, s, won;
 
                 // Skip user's team
                 if (t.tid === g.userTid) {
-                    return cursor.continue();
+                    return;
                 }
 
+                // Change in wins
                 s = t.seasons.length - 1;
                 won = t.seasons[s].won;
                 if (s > 0) {
@@ -867,10 +1287,17 @@ console.log(remove);*/
                     dWon = 0;
                 }
 
-                tx.objectStore("players").index("tid").getAll(t.tid).onsuccess = function (event) {
-                    var age, denominator, i, numerator, players, score, updated, youngStar;
+                // Young stars
+                return dao.players.getAll({
+                    ot: tx,
+                    index: "tid",
+                    key: t.tid,
+                    statsSeasons: [g.season],
+                    statsTid: t.tid
+                }).then(function (players) {
+                    var age, denominator, i, numerator, score, updated, youngStar;
 
-                    players = player.filter(event.target.result, {
+                    players = player.filter(players, {
                         season: g.season,
                         tid: t.tid,
                         attrs: ["age", "value", "contract"],
@@ -894,42 +1321,145 @@ console.log(remove);*/
                     // Average age, weighted by minutes played
                     age = numerator / denominator;
 
-//console.log([t.abbrev, 0.8 * dWon, (won - 41), 5 * (26 - age), youngStar * 20])
                     score = 0.8 * dWon + (won - 41) + 5 * (26 - age) + youngStar * 20;
 
                     updated = false;
                     if (score > 20 && t.strategy === "rebuilding") {
-//console.log(t.abbrev + " switch to contending")
                         t.strategy = "contending";
                         updated = true;
                     } else if (score < -20 && t.strategy === "contending") {
-//console.log(t.abbrev + " switch to rebuilding")
                         t.strategy = "rebuilding";
                         updated = true;
                     }
 
                     if (updated) {
-                        cursor.update(t);
+                        return t;
                     }
-
-                    cursor.continue();
-                };
+                });
             }
-        }
+        });
+    }
 
+    /**
+     * Check roster size limits
+     *
+     * If any AI team is over the maximum roster size, cut their worst players.
+     * If any AI team is under the minimum roster size, sign minimum contract
+     * players until the limit is reached. If the user's team is breaking one of
+     * these roster size limits, display a warning.
+     *
+     * @memberOf core.team
+     * @return {Promise.?string} Resolves to null if there is no error, or a string with the error message otherwise.
+     */
+    function checkRosterSizes() {
+        var checkRosterSize, minFreeAgents, tx, userTeamSizeError;
 
-        tx.oncomplete = function () {
-            cb();
+        checkRosterSize = function (tid) {
+            return dao.players.getAll({ot: tx, index: "tid", key: tid}).then(function (players) {
+                var i, numPlayersOnRoster, p, promises;
+
+                numPlayersOnRoster = players.length;
+                if (numPlayersOnRoster > 15) {
+                    if (g.userTids.indexOf(tid) >= 0 && g.autoPlaySeasons === 0) {
+                        if (g.userTids.length <= 1) {
+                            userTeamSizeError = 'Your team has ';
+                        } else {
+                            userTeamSizeError = 'The ' + g.teamRegionsCache[tid] + ' ' + g.teamNamesCache[tid] + ' have ';
+                        }
+                        userTeamSizeError += 'more than the maximum number of players (15). You must remove players (by <a href="' + helpers.leagueUrl(["roster"]) + '">releasing them from your roster</a> or through <a href="' + helpers.leagueUrl(["trade"]) + '">trades</a>) before continuing.';
+                    } else {
+                        // Automatically drop lowest value players until we reach 15
+                        players.sort(function (a, b) { return a.value - b.value; }); // Lowest first
+                        promises = [];
+                        for (i = 0; i < (numPlayersOnRoster - 15); i++) {
+                            promises.push(player.release(tx, players[i], false));
+                        }
+                        return Promise.all(promises);
+                    }
+                } else if (numPlayersOnRoster < g.minRosterSize) {
+                    if (g.userTids.indexOf(tid) >= 0 && g.autoPlaySeasons === 0) {
+                        if (g.userTids.length <= 1) {
+                            userTeamSizeError = 'Your team has ';
+                        } else {
+                            userTeamSizeError = 'The ' + g.teamRegionsCache[tid] + ' ' + g.teamNamesCache[tid] + ' have ';
+                        }
+                        userTeamSizeError += 'less than the minimum number of players (' + g.minRosterSize + '). You must add players (through <a href="' + helpers.leagueUrl(["free_agents"]) + '">free agency</a> or <a href="' + helpers.leagueUrl(["trade"]) + '">trades</a>) before continuing.<br><br>Reminder: you can always sign free agents to ' + helpers.formatCurrency(g.minContract / 1000, "M", 1) + '/yr contracts, even if you\'re over the cap!';
+                    } else {
+                        // Auto-add players
+                        promises = [];
+                        while (numPlayersOnRoster < g.minRosterSize) {
+                            // See also core.phase
+                            p = minFreeAgents.shift();
+                            p.tid = tid;
+                            p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+                            p = player.setContract(p, p.contract, true);
+                            p.gamesUntilTradable = 15;
+
+                            eventLog.add(null, {
+                                type: "freeAgent",
+                                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+                                showNotification: false,
+                                pids: [p.pid],
+                                tids: [p.tid]
+                            });
+
+                            promises.push(dao.players.put({ot: tx, value: p}));
+
+                            numPlayersOnRoster += 1;
+                        }
+                        return Promise.all(promises);
+                    }
+                }
+            }).then(function () {
+                // Auto sort rosters (except player's team)
+                // This will sort all AI rosters before every game. Excessive? It could change some times, but usually it won't
+                if (g.userTids.indexOf(tid) < 0 || g.autoPlaySeasons > 0) {
+                    return rosterAutoSort(tx, tid);
+                }
+            });
         };
+
+        tx = dao.tx(["players", "playerStats", "releasedPlayers", "teams"], "readwrite");
+
+        userTeamSizeError = null;
+
+        return dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT}).then(function (players) {
+            var i, promises;
+
+            // List of free agents looking for minimum contracts, sorted by value. This is used to bump teams up to the minimum roster size.
+            minFreeAgents = [];
+            for (i = 0; i < players.length; i++) {
+                if (players[i].contract.amount === 500) {
+                    minFreeAgents.push(players[i]);
+                }
+            }
+            minFreeAgents.sort(function (a, b) { return b.value - a.value; });
+
+            // Make sure teams are all within the roster limits
+            promises = [];
+            for (i = 0; i < g.numTeams; i++) {
+                promises.push(checkRosterSize(i));
+            }
+            return Promise.all(promises);
+        }).then(function () {
+            // If I move this outside and use it exclusively to resolve this function, Chrome gets a little racy and one of my unit tests fails
+            return tx.complete().then(function () {
+                return userTeamSizeError;
+            });
+        });
     }
 
     return {
         addSeasonRow: addSeasonRow,
         addStatsRow: addStatsRow,
         generate: generate,
+        findStarters: findStarters,
         rosterAutoSort: rosterAutoSort,
         filter: filter,
         valueChange: valueChange,
-        updateStrategies: updateStrategies
+        updateStrategies: updateStrategies,
+        checkRosterSizes: checkRosterSizes,
+        getPayroll: getPayroll,
+        getPayrolls: getPayrolls
     };
 });

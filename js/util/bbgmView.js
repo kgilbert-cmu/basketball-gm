@@ -2,7 +2,7 @@
  * @name util.bbgmView
  * @namespace Framework for loading, displaying, and updating content. bbgmView is designed so that it is easy to write UIs that are granular in both reading from the database and updating the DOM, to minimize useless updates to previously cached or displayed values. See the documentation for util.bbgmView.init for more detail on use.
  */
-define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "lib/underscore", "util/helpers", "util/viewHelpers"], function (g, ui, $, ko, komapping, _, helpers, viewHelpers) {
+define(["globals", "ui", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "lib/underscore", "util/helpers", "util/viewHelpers"], function (g, ui, Promise, $, ko, komapping, _, helpers, viewHelpers) {
     "use strict";
 
     var vm;
@@ -13,7 +13,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
         container = g.lid !== null ? "league_content" : "content";
         containerEl = document.getElementById(container);
 
-        if (containerEl.dataset.idLoaded !== args.id) {
+        if (containerEl.dataset.idLoaded !== args.id && containerEl.dataset.idLoading === args.id) {
 //console.log('draw from scratch')
             ui.update({
                 container: container,
@@ -31,7 +31,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
 
     function update(args) {
         return function (inputs, updateEvents, cb) {
-            var afterEverything, i, container, containerEl;
+            var container, containerEl, promisesBefore, promisesWhenever;
 
             container = g.lid !== null ? "league_content" : "content";
             containerEl = document.getElementById(container);
@@ -43,6 +43,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
                 ko.cleanNode(containerEl);
 
                 containerEl.dataset.idLoading = args.id;
+                g.vm.topMenu.template(args.id);
 
                 updateEvents.push("firstRun");
 
@@ -54,19 +55,26 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
                 return;
             }
 
-            // This will be called after every runBefore and runWhenever function is finished.
-            afterEverything = _.after(args.runWhenever.length + 1, function () {
-                containerEl.dataset.idLoading = ""; // Done loading
-                cb();
+            // Resolve all the promises before updating the UI to minimize flicker
+            promisesBefore = args.runBefore.map(function (fn) { return fn(inputs, updateEvents, vm); });
+
+            // Run promises in parallel, update when each one is ready
+            // This runs no matter what
+            promisesWhenever = args.runWhenever.map(function (fn) {
+                return Promise.resolve(fn(inputs, updateEvents, vm)).then(function (vars) {
+                    if (vars !== undefined) {
+                        komapping.fromJS(vars, args.mapping, vm);
+                    }
+                });
             });
 
-            $.when.apply(null, _.map(args.runBefore, function (fn) { return fn(inputs, updateEvents, vm); })).done(function () {
-                var vars;
+            Promise.all(promisesBefore).then(function (results) {
+                var promisesAfter, vars;
 
-                if (arguments.length > 1) {
-                    vars = $.extend.apply(null, arguments);
+                if (results.length > 1) {
+                    vars = $.extend.apply(null, results);
                 } else {
-                    vars = arguments[0];
+                    vars = results[0];
                 }
 
                 if (vars !== undefined) {
@@ -78,31 +86,44 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
                         return ui.realtimeUpdate([], vars.redirectUrl, cb);
                     }
 
+                    // This might not do the update all at once, so in cases where you have things like if (x) { y } in the UI, changing x might casue y to get read before y is set. So be careful to set things earlier. See js/views/roster.js filterUntradable stuff.
                     komapping.fromJS(vars, args.mapping, vm);
                 }
-//console.log(vars);
-//console.log(vm);
 
                 display(args, updateEvents);
 
-                afterEverything();
-            });
+                // Run promises in parallel, update when each one is ready
+                // This only runs if it hasn't been short-circuited yet
+                promisesAfter = args.runAfter.map(function (fn) {
+                    return Promise.resolve(fn(inputs, updateEvents, vm)).then(function (vars) {
+                        if (vars !== undefined) {
+                            komapping.fromJS(vars, args.mapping, vm);
+                        }
+                    });
+                });
 
-            for (i = 0; i < args.runWhenever.length; i++) {
-                $.when(args.runWhenever[i](inputs, updateEvents, vm)).done(function (vars) {
-                    if (vars !== undefined) {
-                        komapping.fromJS(vars, args.mapping, vm);
+                return Promise.all([
+                    Promise.all(promisesAfter),
+                    Promise.all(promisesWhenever)
+                ]).then(function () {
+                    if (containerEl.dataset.idLoading === containerEl.dataset.idLoaded) {
+                        containerEl.dataset.idLoading = ""; // Done loading
                     }
 
-                    afterEverything();
+                    // Scroll to top
+                    if (_.isEqual(updateEvents, ["firstRun"])) {
+                        window.scrollTo(window.pageXOffset, 0);
+                    }
+
+                    cb();
                 });
-            }
+            });
         };
     }
 
     function get(fnBeforeReq, fnGet, fnUpdate) {
         return function (req) {
-            fnBeforeReq(req, function (updateEvents, cb) {
+            fnBeforeReq(req).spread(function (updateEvents, cb) {
                 var inputs;
 
                 inputs = fnGet(req);
@@ -125,7 +146,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
 
     function post(fnBeforeReq, fnPost) {
         return function (req) {
-            fnBeforeReq(req, function () {
+            fnBeforeReq(req).then(function () {
                 fnPost(req);
             });
         };
@@ -148,7 +169,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
      * To display a full-screen error message, call helpers.error directly. To redirect to another URL, call ui.realtimeUpdate directly. No fancy short circuiting is needed like in args.get because nothing is run after args.post completes anyway.
      * @param {function(Object)=} args.InitViewModel Optional constructor function defining the initial Knockout view model structure created immediately after a GET request. This should only be used when absolutely necessary, and in those cases should be as minimal as possible. The only valid uses are (1) to create properties on the view model that are needed by other functions (in args.runBefore and args.runWhenever) to check if updates are needed, and (2) to define computed observables and the observables they directly depend on. As this is a constructor function, view model properites should be attached to this.
      * @param {Object=} args.mapping Optional object defining the structure of the mapping (via the Knockout mappping plugin) between the output of all args.runBefore and runWhenever functions. "All" means that this single mapping object is used in multiple different places with multiple different subsets of data, so it should be able to handle everything. Specifically, all the results of the args.runBefore functions are run through the mapping plugin together, while each result from a runWhenever function is run through separately. If undefined, then the default for the Knockout mappping plugin will be used.
-     * @param {Array.<function(Object, Array.<string>, Object): Object=>} args.runBefore Array of functions run before the template is displayed/updated. Arguments of each function are inputs (return value of get), updateEvents (containing information about what changed this load/update, such as "gameSim" or "playerMovement", and also "firstRun" if this is the first load of a page and not a refresh), and vm (the current Knockout view model). If there is something to update, the function returns a jQuery promise that resolves when the updated data has been retrieved.
+     * @param {Array.<function(Object, Array.<string>, Object): Object=>=} args.runBefore Array of functions run before the template is displayed/updated. Arguments of each function are inputs (return value of get), updateEvents (containing information about what changed this load/update, such as "gameSim" or "playerMovement", and also "firstRun" if this is the first load of a page and not a refresh), and vm (the current Knockout view model). If there is something to update, the function returns a jQuery promise that resolves when the updated data has been retrieved.
      * There are two ways that a args.runBefore function can update the view model: (1) send some data when it resolves, which is then applied (with the Knockout mapping plugin and args.mapping) after all args.runBefore functions have finished, or (2) update the view model directly. (1) is preferred to (2) unless there is some very compelling reason otherwise, because (1) means that all fast updates will happen together rather than having some parts of the UI update at different times. Normally, the view model should just be used to read values, and even then it should be done as minimally as possible.
     * To display a full-screen error message, include an "errorMessage" property with string contents in the object passed to the resolved promise. To redirect to another URL, include a "redirectUrl" property containing the URL in the object passed to the resolved promise. Either displaying an error message or redirecting this way will short-circuit the rest of the loading of the view (but only after all runBefore functions are complete).
      * @param {Array.<function(Object, Array.<string>, Object): Object=>=} args.runWhenever Similar to args.runBefore, except the template can be displayed before it finishes. Therefore, this is optional and should only be used for slow functions, which should be uncommon. The only other difference from args.runBefore is that the view model is updated after each one of these functions finishes, rather than waiting for all of them. Thus, it's somewhat less bad to update the view model directly here.
@@ -162,6 +183,8 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "
         args.InitViewModel = args.InitViewModel !== undefined ? args.InitViewModel : function () { };
         args.beforeReq = args.beforeReq !== undefined ? args.beforeReq : viewHelpers.beforeLeague;
         args.get = args.get !== undefined ? args.get : function () { return {}; };
+        args.runBefore = args.runBefore !== undefined ? args.runBefore : [];
+        args.runAfter = args.runAfter !== undefined ? args.runAfter : [];
         args.runWhenever = args.runWhenever !== undefined ? args.runWhenever : [];
         args.mapping = args.mapping !== undefined ? args.mapping : {};
 

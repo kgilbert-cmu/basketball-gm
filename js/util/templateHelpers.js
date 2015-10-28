@@ -9,7 +9,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var args = valueAccessor();
             return ko.bindingHandlers.text.update(element, function () {
-                return helpers.round(ko.utils.unwrapObservable(args[0]), args[1]);
+                return helpers.round(ko.unwrap(args[0]), args[1]);
             });
         }
     };
@@ -18,7 +18,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var arg, output;
 
-            arg = ko.utils.unwrapObservable(valueAccessor());
+            arg = ko.unwrap(valueAccessor());
 
             output = parseFloat(arg).toFixed(3);
 
@@ -47,17 +47,21 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
             series = viewModel.series()[args[0]][args[1]];
 
             source = '';
-            if (series && series.home.name) {
+            if (series && series.home.tid) {
+                if (series.home.tid() === g.userTid) { source += '<span class="bg-info">'; }
                 if (series.home.hasOwnProperty("won") && series.home.won() === 4) { source += '<strong>'; }
-                source += series.home.seed() + '. <a href="' + helpers.leagueUrl(["roster", series.home.abbrev(), season]) + '">' + series.home.name() + '</a>';
+                source += series.home.seed() + '. <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[series.home.tid()], season]) + '">' + g.teamRegionsCache[series.home.tid()] + '</a>';
                 if (series.home.hasOwnProperty("won")) { source += ' ' + series.home.won(); }
                 if (series.home.hasOwnProperty("won") && series.home.won() === 4) { source += '</strong>'; }
+                if (series.home.tid() === g.userTid) { source += '</span>'; }
                 source += '<br>';
 
+                if (series.away.tid() === g.userTid) { source += '<span class="bg-info">'; }
                 if (series.home.hasOwnProperty("won") && series.away.won() === 4) { source += '<strong>'; }
-                source += series.away.seed() + '. <a href="' + helpers.leagueUrl(["roster", series.away.abbrev(), season]) + '">' + series.away.name() + '</a>';
+                source += series.away.seed() + '. <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[series.away.tid()], season]) + '">' + g.teamRegionsCache[series.away.tid()] + '</a>';
                 if (series.away.hasOwnProperty("won")) { source += ' ' + series.away.won(); }
                 if (series.home.hasOwnProperty("won") && series.away.won() === 4) { source += '</strong>'; }
+                if (series.away.tid() === g.userTid) { source += '</span>'; }
             }
 
             return ko.bindingHandlers.html.update(element, function () {
@@ -68,7 +72,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
 
     ko.bindingHandlers.newWindow = {
         update: function (element, valueAccessor) {
-            var args, i, url;
+            var args, url;
 
             args = valueAccessor();
 
@@ -80,7 +84,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
 
             return ko.bindingHandlers.html.update(element, function () {
                 // Window name is set to the current time, so each window has a unique name and thus a new window is always opened
-                return '<a href="javascript:(function () { window.open(\'' + url + '?w=popup\', Date.now(), \'height=600,width=800,scrollbars=yes\'); }())" class="new_window" title="Move To New Window" data-no-davis="true"><img src="/ico/new_window.png" height="16" width="16"></a>';
+                return '<a href="javascript:(function () { window.open(\'' + url + '?w=popup\', Date.now(), \'height=600,width=800,scrollbars=yes\'); }())" class="new_window" title="Move To New Window" data-no-davis="true"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA0AAAANABeWPPlAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFOSURBVDiNlZS9isJAFIU/F6s0m0VYYiOrhVukWQsbK4t9CDtbexGs8xY+ghY+QRBsbKcTAjZaqKyGXX2Bs00S1AwBD1yYOXPvmXvv/CAJSQAuoGetzAPCMKRSqTzSOURRRK/Xo1wqldyEewXwfR/P8zLHIAhYr9fZ3BjDeDym1WoBUAZ+i3ZaLBYsl8s7zhiTCbwk3DfwaROYz+fsdjs6nU7GOY6TjVOBGPixCbiuy2g0YrVa0Ww2c+svlpg7DAYDptMp3W6XyWRi9RHwRXKMh8NBKYbDoQC1221dr1dtNhv1+33NZjMZY9KjtAsEQSBAvu/rfD7rEYUC2+1WjuOo0Whov9/ngm8FchcJoFarEYYhnudRrVYLe5QTOJ1OANTrdQCOx6M1MI5jexOftdsMLsBbYb7wDkTAR+KflWC9hRakr+wi6e+2hGfNTb+Bf9965Lxmndc1AAAAAElFTkSuQmCC" height="16" width="16"></a>';
             });
         }
     };
@@ -89,7 +93,16 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var arg = valueAccessor();
             return ko.bindingHandlers.html.update(element, function () {
-                return helpers.skillsBlock(ko.utils.unwrapObservable(arg));
+                return helpers.skillsBlock(ko.unwrap(arg));
+            });
+        }
+    };
+
+    ko.bindingHandlers.watchBlock = {
+        update: function (element, valueAccessor) {
+            var args = valueAccessor();
+            return ko.bindingHandlers.html.update(element, function () {
+                return helpers.watchBlock(ko.unwrap(args[0]), ko.unwrap(args[1]));
             });
         }
     };
@@ -98,7 +111,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var args = valueAccessor();
             return ko.bindingHandlers.text.update(element, function () {
-                return helpers.formatCurrency(ko.utils.unwrapObservable(args[0]), args[1]);
+                return helpers.formatCurrency(ko.unwrap(args[0]), args[1]);
             });
         }
     };
@@ -107,7 +120,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var args = valueAccessor();
             return ko.bindingHandlers.text.update(element, function () {
-                return helpers.numberWithCommas(ko.utils.unwrapObservable(args));
+                return helpers.numberWithCommas(ko.unwrap(args));
             });
         }
     };
@@ -117,19 +130,19 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
             var args, injury;
 
             args = valueAccessor();
-            injury = ko.utils.unwrapObservable(args[2]);
-            injury.type = ko.utils.unwrapObservable(injury.type);
-            injury.gamesRemaining = ko.utils.unwrapObservable(injury.gamesRemaining);
+            injury = ko.unwrap(args[2]);
+            injury.type = ko.unwrap(injury.type);
+            injury.gamesRemaining = ko.unwrap(injury.gamesRemaining);
 
             return ko.bindingHandlers.html.update(element, function () {
-                return helpers.playerNameLabels(ko.utils.unwrapObservable(args[0]), ko.utils.unwrapObservable(args[1]), injury, ko.utils.unwrapObservable(args[3]));
+                return helpers.playerNameLabels(ko.unwrap(args[0]), ko.unwrap(args[1]), injury, ko.unwrap(args[3]), ko.unwrap(args[4]));
             });
         }
     };
 
     ko.bindingHandlers.attrLeagueUrl = {
-        update: function (element, valueAccessor) {
-            var args, attr, i, options, toAttr, url;
+        update: function (element, valueAccessor, allBindingsAccessor, viewModel) {
+            var args, attr, options, toAttr;
 
             args = valueAccessor();
             toAttr = {};
@@ -143,7 +156,7 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
                         options = {};
                     }
 
-                    toAttr[attr] = helpers.leagueUrl(args[attr], options);
+                    toAttr[attr] = helpers.leagueUrl(args[attr], options, viewModel.lid);
                 }
             }
 
@@ -163,10 +176,12 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var arg = valueAccessor();
             return ko.bindingHandlers.html.update(element, function () {
-                return '<form id="' + arg + '-dropdown" class="form-inline pull-right">' +
+                return '<form id="' + arg + '-dropdown" class="form-inline pull-right bbgm-dropdown" role="form">' +
                        '<!-- ko foreach: fields -->' +
-                         '<select data-bind="attr: {id: id, class: name}, options: options, optionsText: \'val\', optionsValue: \'key\', value: selected">' +
+                         '<div class="form-group" style="margin-left: 4px; margin-bottom: 4px;">' +
+                         '<select data-bind="attr: {id: id, class: \'form-control \' + name}, options: options, optionsText: \'val\', optionsValue: \'key\', value: selected">' +
                          '</select>' +
+                         '</div>' +
                        '<!-- /ko -->' +
                        '</form>';
             });
@@ -177,14 +192,13 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var abbrev, args, extraText, lost, option, output, playoffRoundsWon, season, won;
 
-
             args = valueAccessor();
-            abbrev = ko.utils.unwrapObservable(args[0]);
-            season = ko.utils.unwrapObservable(args[1]);
-            won = ko.utils.unwrapObservable(args[2]);
-            lost = ko.utils.unwrapObservable(args[3]);
-            playoffRoundsWon = ko.utils.unwrapObservable(args[4]);
-            option = args.length > 5 ? ko.utils.unwrapObservable(args[5]) : null;
+            abbrev = ko.unwrap(args[0]);
+            season = ko.unwrap(args[1]);
+            won = ko.unwrap(args[2]);
+            lost = ko.unwrap(args[3]);
+            playoffRoundsWon = ko.unwrap(args[4]);
+            option = args.length > 5 ? ko.unwrap(args[5]) : null;
 
             extraText = "";
             if (playoffRoundsWon === 4) {
@@ -218,7 +232,118 @@ define(["globals", "lib/faces", "lib/knockout", "util/helpers"], function (g, fa
         update: function (element, valueAccessor) {
             var args = valueAccessor();
             return ko.bindingHandlers.html.update(element, function () {
-                return helpers.draftAbbrev(ko.utils.unwrapObservable(args[0]), ko.utils.unwrapObservable(args[1]));
+                return helpers.draftAbbrev(ko.unwrap(args[0]), ko.unwrap(args[1]));
+            });
+        }
+    };
+
+    ko.bindingHandlers.ordinal = {
+        update: function (element, valueAccessor) {
+            var arg = valueAccessor();
+            return ko.bindingHandlers.html.update(element, function () {
+                return helpers.ordinal(parseInt(ko.unwrap(arg), 10));
+            });
+        }
+    };
+
+    ko.bindingHandlers.gameScore = {
+        update: function (element, valueAccessor) {
+            var arg, newArg, stat;
+            arg = valueAccessor();
+            newArg = {}; // To prevent unwrapping the underlying observable
+            for (stat in arg) {
+                if (arg.hasOwnProperty(stat)) {
+                    newArg[stat] = ko.unwrap(arg[stat]);
+                }
+            }
+            return ko.bindingHandlers.html.update(element, function () {
+                return helpers.gameScore(newArg);
+            });
+        }
+    };
+
+    ko.bindingHandlers.multiTeamMenu = {
+        update: function (element, valueAccessor) {
+            var arg, i, options, teamNames, userTid, userTids;
+            arg = valueAccessor();
+            userTid = ko.unwrap(arg[0]);
+            userTids = ko.unwrap(arg[1]);
+
+            // Hide if not multi team or not loaded yet
+            if (userTids.length <= 1 || g.teamRegionsCache === undefined) {
+                return ko.bindingHandlers.visible.update(element, function () {
+                    return false;
+                });
+            }
+
+            ko.bindingHandlers.visible.update(element, function () {
+                return true;
+            });
+
+            teamNames = userTids.map(function (t) {
+                return g.teamRegionsCache[t] + " " + g.teamNamesCache[t];
+            });
+
+            options = "";
+            for (i = 0; i < userTids.length; i++) {
+                if (userTid === userTids[i]) {
+                    options += '<option value="' + userTids[i] + '" selected>' + teamNames[i] + '</option>';
+                } else {
+                    options += '<option value="' + userTids[i] + '">' + teamNames[i] + '</option>';
+                }
+            }
+
+            return ko.bindingHandlers.html.update(element, function () {
+                return '<label for="multi-team-select">Currently controlling:</label><br><select class="form-control" id="multi-team-select" onchange="require(\'util/helpers\').updateMultiTeam(parseInt(this.options[this.selectedIndex].value, 10))">' + options + '</select>';
+            });
+        }
+    };
+
+    ko.bindingHandlers.plusMinus = {
+        update: function (element, valueAccessor) {
+            var arg, plusminus, round;
+            arg = valueAccessor();
+            plusminus = ko.unwrap(arg[0]);
+            round = ko.unwrap(arg[1]);
+
+            return ko.bindingHandlers.html.update(element, function () {
+                var val = helpers.plusMinus(plusminus, round);
+                return (val !== val ? "" : val);
+            });
+        }
+    };
+
+    ko.bindingHandlers.jumpToDropdown = {
+        init: function () {
+            // http://www.knockmeout.net/2012/05/quick-tip-skip-binding.html
+            return {
+                controlsDescendantBindings: true
+            };
+        },
+        update: function (element, valueAccessor) {
+            var arg, season;
+
+            arg = valueAccessor();
+            season = ko.unwrap(arg);
+
+            return ko.bindingHandlers.html.update(element, function () {
+                return '<div class="btn-group pull-right">' +
+                       '  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' +
+                       '    Jump To <span class="caret"></span>' +
+                       '  </button>' +
+                       '  <ul class="dropdown-menu">' +
+                       '    <li><a href="' + helpers.leagueUrl(['standings', season]) + '">Standings</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['playoffs', season]) + '">Playoffs</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['history', season]) + '">Season Summary</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['league_finances', season]) + '">Finances</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['transactions', 'all', season]) + '">Transactions</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['draft_summary', season]) + '">Draft</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['leaders', season]) + '">Leaders</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['team_stats', season]) + '">Team Stats</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['player_stats', 'all', season]) + '">Player Stats</a></li>' +
+                       '    <li><a href="' + helpers.leagueUrl(['player_ratings', 'all', season]) + '">Player Ratings</a></li>' +
+                       '  </ul>' +
+                       '</div>';
             });
         }
     };

@@ -2,16 +2,12 @@
  * @name views.negotiation
  * @namespace Contract negotiation.
  */
-define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (db, g, ui, contractNegotiation, player, $, ko, _, bbgmView, helpers, viewHelpers) {
+define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core/team", "lib/knockout", "util/bbgmView", "util/helpers"], function (dao, g, ui, contractNegotiation, player, team, ko, bbgmView, helpers) {
     "use strict";
 
     // Show the negotiations list if there are more ongoing negotiations
     function redirectNegotiationOrRoster(cancelled) {
-        g.dbl.transaction("negotiations").objectStore("negotiations").getAll().onsuccess = function (event) {
-            var negotiations;
-
-            negotiations = event.target.result;
-
+        dao.negotiations.getAll().then(function (negotiations) {
             if (negotiations.length > 0) {
                 ui.realtimeUpdate([], helpers.leagueUrl(["negotiation"]));
             } else if (cancelled) {
@@ -19,7 +15,7 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
             } else {
                 ui.realtimeUpdate([], helpers.leagueUrl(["roster"]));
             }
-        };
+        });
     }
 
     function get(req) {
@@ -38,62 +34,64 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
         pid = parseInt(req.params.pid, 10);
 
         if (req.params.hasOwnProperty("cancel")) {
-            contractNegotiation.cancel(pid, function () {
+            contractNegotiation.cancel(pid).then(function () {
                 redirectNegotiationOrRoster(true);
             });
         } else if (req.params.hasOwnProperty("accept")) {
-            contractNegotiation.accept(pid, function (error) {
+            contractNegotiation.accept(pid).then(function (error) {
                 if (error !== undefined && error) {
-                    helpers.error(error);
-                } else {
-                    redirectNegotiationOrRoster(false);
+                    helpers.errorNotify(error);
                 }
+                redirectNegotiationOrRoster(false);
             });
         } else if (req.params.hasOwnProperty("new")) {
             // If there is no active negotiation with this pid, create it
-            g.dbl.transaction("negotiations").objectStore("negotiations").get(pid).onsuccess = function (event) {
-                var negotiation;
-
-                negotiation = event.target.result;
-
+            dao.negotiations.get({key: pid}).then(function (negotiation) {
+                var tx;
                 if (!negotiation) {
-                    contractNegotiation.create(null, pid, false, function (error) {
-                        if (error !== undefined && error) {
-                            helpers.error(error);
-                        } else {
-                            ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
-                        }
+                    tx = dao.tx(["gameAttributes", "messages", "negotiations", "players"], "readwrite");
+                    contractNegotiation.create(tx, pid, false).then(function (error) {
+                        tx.complete().then(function () {
+                            if (error !== undefined && error) {
+                                helpers.errorNotify(error);
+                                ui.realtimeUpdate([], helpers.leagueUrl(["free_agents"]));
+                            } else {
+                                ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
+                            }
+                        });
                     });
                 } else {
                     ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
                 }
-            };
+            });
         } else {
             // Make an offer to the player;
             teamAmountNew = parseInt(req.params.teamAmount * 1000, 10);
             teamYearsNew = parseInt(req.params.teamYears, 10);
-            contractNegotiation.offer(pid, teamAmountNew, teamYearsNew, function () {
+
+            // Any NaN?
+            if (teamAmountNew !== teamAmountNew || teamYearsNew !== teamYearsNew) {
                 ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
-            });
+            } else {
+                contractNegotiation.offer(pid, teamAmountNew, teamYearsNew).then(function () {
+                    ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
+                });
+            }
         }
     }
 
-    function updateNegotiation(inputs, updateEvents, vm) {
-        var deferred, vars;
-
-        deferred = $.Deferred();
-        vars = {};
-
-        g.dbl.transaction("negotiations").objectStore("negotiations").openCursor(inputs.pid).onsuccess = function (event) {
+    function updateNegotiation(inputs) {
+        // Call getAll so it works on null key
+        return dao.negotiations.getAll({key: inputs.pid}).then(function (negotiations) {
             var negotiation;
 
-            negotiation = event.target.result.value;
-
-            if (!negotiation) {
-                return deferred.resolve({
+            if (negotiations.length === 0) {
+                return {
                     errorMessage: "No negotiation with player " + inputs.pid + " in progress."
-                });
+                };
             }
+
+            negotiation = negotiations[0];
 
             negotiation.player.expiration = negotiation.player.years + g.season;
             // Adjust to account for in-season signings
@@ -101,10 +99,11 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
                 negotiation.player.expiration -= 1;
             }
 
-            g.dbl.transaction("players").objectStore("players").get(negotiation.pid).onsuccess = function (event) {
-                var p, teams;
-
-                p = player.filter(event.target.result, {
+            // Can't flatten more because of the return errorMessage above
+            return dao.players.get({
+                key: negotiation.pid
+            }).then(function (p) {
+                p = player.filter(p, {
                     attrs: ["pid", "name", "freeAgentMood"],
                     ratings: ["ovr", "pot"],
                     season: g.season,
@@ -113,6 +112,15 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
                     fuzz: true
                 });
 
+                // This can happen if a negotiation is somehow started with a retired player
+                if (!p) {
+                    contractNegotiation.cancel(negotiation.pid);
+                    return {
+                        errorMessage: "Invalid negotiation. Please try again."
+                    };
+                }
+
+                // See views.freeAgents for moods as well
                 if (p.freeAgentMood[g.userTid] < 0.25) {
                     p.mood = '<span class="text-success"><b>Eager to reach an agreement.</b></span>';
                 } else if (p.freeAgentMood[g.userTid] < 0.5) {
@@ -120,17 +128,15 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
                 } else if (p.freeAgentMood[g.userTid] < 0.75) {
                     p.mood = '<span class="text-warning"><b>Annoyed at you.</b></span>';
                 } else {
-                    p.mood = '<span class="text-error"><b>Insulted by your presence.</b></span>';
+                    p.mood = '<span class="text-danger"><b>Insulted by your presence.</b></span>';
                 }
                 delete p.freeAgentMood;
 
-                teams = helpers.getTeams();
-
-                db.getPayroll(null, g.userTid, function (payroll) {
-                    vars = {
+                return team.getPayroll(null, g.userTid).get(0).then(function (payroll) {
+                    return {
                         salaryCap: g.salaryCap / 1000,
                         payroll: payroll / 1000,
-                        team: {region: teams[g.userTid].region, name: teams[g.userTid].name},
+                        team: {region: g.teamRegionsCache[g.userTid], name: g.teamNamesCache[g.userTid]},
                         player: p,
                         negotiation: {
                             team: {
@@ -145,13 +151,9 @@ define(["db", "globals", "ui", "core/contractNegotiation", "core/player", "lib/j
                             resigning: negotiation.resigning
                         }
                     };
-
-                    deferred.resolve(vars);
                 });
-            };
-        };
-
-        return deferred.promise();
+            });
+        });
     }
 
     function uiFirst(vm) {

@@ -2,7 +2,7 @@
  * @name views.hallOfFame
  * @namespace Hall of fame table.
  */
-define(["globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, player, $, ko, _, bbgmView, helpers, viewHelpers) {
+define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, player, $, ko, _, bbgmView, helpers) {
     "use strict";
 
     var mapping;
@@ -25,58 +25,49 @@ define(["globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/under
         }
     };
 
-    function updatePlayers(inputs, updateEvents, vm) {
-        var deferred, playersAll;
-
+    function updatePlayers(inputs, updateEvents) {
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.BEFORE_DRAFT)) {
-            deferred = $.Deferred();
-
-            playersAll = [];
-
-            g.dbl.transaction("players").objectStore("players").index("tid").openCursor(g.PLAYER.RETIRED).onsuccess = function (event) {
-                var cursor, i, j, p, players;
-
-                cursor = event.target.result;
-                if (cursor) {
-                    p = cursor.value;
-                    if (p.hof) {
-                        playersAll.push(p);
-                    }
-                    cursor.continue();
-                } else {
-                    players = player.filter(playersAll, {
-                        attrs: ["pid", "name", "pos", "draft", "retiredYear"],
-                        ratings: ["ovr"],
-                        stats: ["season", "abbrev", "gp", "min", "trb", "ast", "pts", "per"]
-                    });
-
-                    // This stuff isn't in player.filter because it's only used here.
-                    for (i = 0; i < players.length; i++) {
-                        players[i].peakOvr = 0;
-                        for (j = 0; j < players[i].ratings.length; j++) {
-                            if (players[i].ratings[j].ovr > players[i].peakOvr) {
-                                players[i].peakOvr = players[i].ratings[j].ovr;
-                            }
-                        }
-
-                        players[i].bestStats = {
-                            gp: 0,
-                            min: 0,
-                            per: 0
-                        };
-                        for (j = 0; j < players[i].stats.length; j++) {
-                            if (players[i].stats[j].gp * players[i].stats[j].min * players[i].stats[j].per > players[i].bestStats.gp * players[i].bestStats.min * players[i].bestStats.per) {
-                                players[i].bestStats = players[i].stats[j];
-                            }
-                        }
-                    }
-
-                    deferred.resolve({
-                        players: players
-                    });
+            return dao.players.getAll({
+                index: "tid",
+                key: g.PLAYER.RETIRED,
+                statsSeasons: "all",
+                filter: function (p) {
+                    return p.hof;
                 }
-            };
-            return deferred.promise();
+            }).then(function (players) {
+                var i, j;
+
+                players = player.filter(players, {
+                    attrs: ["pid", "name", "draft", "retiredYear", "statsTids"],
+                    ratings: ["ovr", "pos"],
+                    stats: ["season", "abbrev", "gp", "min", "trb", "ast", "pts", "per", "ewa"]
+                });
+
+                // This stuff isn't in player.filter because it's only used here.
+                for (i = 0; i < players.length; i++) {
+                    players[i].peakOvr = 0;
+                    for (j = 0; j < players[i].ratings.length; j++) {
+                        if (players[i].ratings[j].ovr > players[i].peakOvr) {
+                            players[i].peakOvr = players[i].ratings[j].ovr;
+                        }
+                    }
+
+                    players[i].bestStats = {
+                        gp: 0,
+                        min: 0,
+                        per: 0
+                    };
+                    for (j = 0; j < players[i].stats.length; j++) {
+                        if (players[i].stats[j].gp * players[i].stats[j].min * players[i].stats[j].per > players[i].bestStats.gp * players[i].bestStats.min * players[i].bestStats.per) {
+                            players[i].bestStats = players[i].stats[j];
+                        }
+                    }
+                }
+
+                return {
+                    players: players
+                };
+            });
         }
     }
 
@@ -85,9 +76,18 @@ define(["globals", "ui", "core/player", "lib/jquery", "lib/knockout", "lib/under
 
         ko.computed(function () {
             ui.datatable($("#hall-of-fame"), 2, _.map(vm.players(), function (p) {
-                return ['<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>', p.pos, String(p.draft.year), String(p.retiredYear), String(p.peakOvr), String(p.bestStats.season),  '<a href="' + helpers.leagueUrl(["roster", p.bestStats.abbrev, p.bestStats.season]) + '">' + p.bestStats.abbrev + '</a>', String(p.bestStats.gp), helpers.round(p.bestStats.min, 1), helpers.round(p.bestStats.pts, 1), helpers.round(p.bestStats.trb, 1), helpers.round(p.bestStats.ast, 1), helpers.round(p.bestStats.per, 1), String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1)];
-            }));
+                return ['<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>', p.ratings[p.ratings.length - 1].pos, String(p.draft.year), String(p.retiredYear), String(p.peakOvr), String(p.bestStats.season), '<a href="' + helpers.leagueUrl(["roster", p.bestStats.abbrev, p.bestStats.season]) + '">' + p.bestStats.abbrev + '</a>', String(p.bestStats.gp), helpers.round(p.bestStats.min, 1), helpers.round(p.bestStats.pts, 1), helpers.round(p.bestStats.trb, 1), helpers.round(p.bestStats.ast, 1), helpers.round(p.bestStats.per, 1), String(p.careerStats.gp), helpers.round(p.careerStats.min, 1), helpers.round(p.careerStats.pts, 1), helpers.round(p.careerStats.trb, 1), helpers.round(p.careerStats.ast, 1), helpers.round(p.careerStats.per, 1), helpers.round(p.careerStats.ewa, 1), p.statsTids.indexOf(g.userTid) >= 0];
+            }), {
+                rowCallback: function (row, data) {
+                    // Highlight players from the user's team
+                    if (data[data.length - 1]) {
+                        row.classList.add("info");
+                    }
+                }
+            });
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($("#hall-of-fame"));
     }
 
     return bbgmView.init({

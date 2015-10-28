@@ -2,10 +2,10 @@
  * @name util.message
  * @namespace Messages from the owner of the team to the GM.
  */
-define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
+define(["dao", "globals", "lib/bluebird", "util/helpers", "util/random"], function (dao, g, Promise, helpers, random) {
     "use strict";
 
-    var activities, playoffs, intro, first, money, ovr, wins;
+    var activities, first, intro, money, ovr, playoffs, wins;
 
     // First message after new game
     first = [
@@ -39,7 +39,8 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
         "lobbying the state government for more subsidies",
         "figuring out how to fit in more courtside seats for celebrities",
         "coming up with a way to slightly shrink or expand the hoop, depending on which one we're shooting at",
-        "perfecting my money laundering infrastructure (owning this team is very helpful)"
+        "perfecting my money laundering infrastructure (owning this team is very helpful)",
+        "making sure my \"girlfriends\" aren't posting pictures with black people on Instagram (how many times do I have to tell them??)"
     ];
 
     // Intro of annual message
@@ -135,19 +136,29 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
     ];
     ovr[1] = [
         "You bore me. Everything about you, it's just boring. Come talk to me when you've earned me more millions and won me some more championships.",
-        "You know, general managers aren't hired to be mediocre. Do better this year."
+        "You know, general managers aren't hired to be mediocre. Do better next year.",
+        "I've been meaning to tell you about this great idea I had. What if we only play 4 guys on defense, so the other guy can just wait for an easy score at the other end? Pure genius, isn't it?"
     ];
     ovr[2] = [
         "Anyway, overall I'm happy with the progress you've made, but I need to get back to {{activity}}."
     ];
 
-    function generate(deltas, cb) {
-        var activity1, activity2, indMoney, indOverall, indPlayoffs, indOvr, indWins, m, ownerMoodSum, tx;
+    /**
+     * @param {IDBTransaction} tx An IndexedDB transaction on gameAttributes and messages, readwrite.
+     */
+    function generate(tx, deltas) {
+        var activity1, activity2, indMoney, indOvr, indPlayoffs, indWins, m, ownerMoodSum;
+
+        // If auto play seasons or multi team mode, no messages
+        if (g.autoPlaySeasons > 0 || g.userTids.length > 1) {
+            return Promise.resolve();
+        }
 
         ownerMoodSum = g.ownerMood.wins + g.ownerMood.playoffs + g.ownerMood.money;
 
-        if (g.season === g.startingSeason) {
+        if (g.showFirstOwnerMessage) {
             m = random.choice(first);
+            require("core/league").setGameAttributes(tx, {showFirstOwnerMessage: false}); // Okay that this is async, since it won't be called again until much later
         } else {
             activity1 = random.choice(activities);
             activity2 = random.choice(activities);
@@ -156,7 +167,7 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
             }
 
             indWins = 2;
-            if (g.ownerMood.wins < 0 && deltas.wins < 0) {
+            if (g.ownerMood.wins <= 0 && deltas.wins < 0) {
                 indWins = 0;
             } else if (g.ownerMood.wins < -0.5 && deltas.wins >= 0) {
                 indWins = 1;
@@ -166,11 +177,11 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
                 indWins = 4;
             }
 
-            if (g.ownerMood.playoffs < 0 && deltas.playoffs < 0) {
+            if (g.ownerMood.playoffs <= 0 && deltas.playoffs < 0) {
                 indPlayoffs = 0;
-            } else if (g.ownerMood.playoffs < 0 && deltas.playoffs === 0) {
+            } else if (g.ownerMood.playoffs <= 0 && deltas.playoffs === 0) {
                 indPlayoffs = 1;
-            } else if (g.ownerMood.playoffs < 0 && deltas.playoffs > 0) {
+            } else if (g.ownerMood.playoffs <= 0 && deltas.playoffs > 0) {
                 indPlayoffs = 2;
             } else if (g.ownerMood.playoffs >= 0 && deltas.playoffs >= 0) {
                 indPlayoffs = 2;
@@ -204,6 +215,16 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
                     "<p>" + random.choice(wins[indWins]) + " " + random.choice(playoffs[indPlayoffs]) + "</p>" +
                     "<p>" + random.choice(money[indMoney]) + "</p>" +
                     "<p>" + random.choice(ovr[indOvr]).replace("{{activity}}", activity2) + "</p>";
+            } else if (g.season < g.gracePeriodEnd || g.godMode) {
+                if (deltas.wins < 0 && deltas.playoffs < 0 && deltas.money < 0) {
+                    m = "<p>What the hell did you do to my franchise?! I'd fire you, but I can't find anyone who wants to clean up your mess.</p>";
+                } else if (deltas.money < 0 && deltas.wins >= 0 && deltas.playoffs >= 0) {
+                    m = "<p>I don't care what our colors are. I need to see some green! I won't wait forever. MAKE ME MONEY.</p>";
+                } else if (deltas.money >= 0 && deltas.wins < 0 && deltas.playoffs < 0) {
+                    m = "<p>Our fans are out for blood. Put a winning team together, or I'll let those animals have you.</p>";
+                } else {
+                    m = "<p>The longer you keep your job, the more I question why I hired you. Do better or get out.</p>";
+                }
             } else {
                 if (g.ownerMood.wins < 0 && g.ownerMood.playoffs < 0 && g.ownerMood.money < 0) {
                     m = "<p>You've been an all-around disappointment. You're fired.</p>";
@@ -214,23 +235,32 @@ define(["db", "globals", "ui", "util/random"], function (db, g, ui, random) {
                 } else {
                     m = "<p>You're fired.</p>";
                 }
+                m += '<p>I hear a few other teams are looking for a new GM. <a href="' + helpers.leagueUrl(["new_team"]) + '">Take a look.</a> Please, go run one of those teams into the ground.</p>';
             }
         }
 
-        tx = g.dbl.transaction("messages", "readwrite");
-        tx.objectStore("messages").add({
-            read: false,
-            from: "The Owner",
-            year: g.season,
-            text: m
-        });
-        tx.oncomplete = function () {
-            if (ownerMoodSum > -1) {
-                cb();
-            } else {
-                db.setGameAttributes({gameOver: true}, cb);
+        return dao.messages.add({
+            ot: tx,
+            value: {
+                read: false,
+                from: "The Owner",
+                year: g.season,
+                text: m
             }
-        };
+        }).then(function () {
+            if (ownerMoodSum > -1) {
+                return;
+            }
+            if (g.season < g.gracePeriodEnd || g.godMode) {
+                // Can't get fired yet... or because of God Mode
+                return;
+            }
+            // Fired!
+            return require("core/league").setGameAttributes(tx, {
+                gameOver: true,
+                showFirstOwnerMessage: true
+            });
+        });
     }
 
     return {

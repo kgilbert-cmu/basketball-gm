@@ -2,96 +2,168 @@
  * @name db
  * @namespace Creating, migrating, and connecting to databases; working with transactions.
  */
-define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "util/helpers"], function (g, player, Davis, $, _, helpers) {
+define(["dao", "globals", "lib/bluebird", "lib/davis", "lib/underscore", "util/eventLog", "util/helpers"], function (dao, g, Promise, Davis, _, eventLog, helpers) {
     "use strict";
+
+    var migrateMessage = '<h1>Upgrading...</h1><p>This might take a few minutes, depending on the size of your league.</p><p>If something goes wrong, <a href="http://webmasters.stackexchange.com/questions/8525/how-to-open-the-javascript-console-in-different-browsers" target="_blank">open the console</a> and see if there is an error message there. Then <a href="https://basketball-gm.com/contact/" target="_blank">let us know about your problem</a>. Please include as much info as possible.</p>';
+
+    function abortHandler(event) {
+        if (!event.target.error) {
+            // Transaction was manually aborted in code, such as during phase change. This is not an error.
+            return;
+        }
+
+        if (event.target.error.name === "QuotaExceededError") {
+            eventLog.add(null, {
+                type: "error",
+                text: 'Your browser isn\'t letting Basketball GM store any more data!<br><br>Try <a href="/">deleting some old leagues</a> or deleting old data (Tools > Improve Performance within a league). Clearing space elsewhere on your hard drive might help too. <a href="https://basketball-gm.com/manual/debugging/quota-errors/"><b>Read this for more info.</b></a>',
+                saveToDb: false
+            });
+        } else {
+            console.log("Database abort!");
+            throw event.target.error;
+        }
+    }
 
     /**
      * Create new meta database with the latest structure.
-     * 
+     *
      * @param {Object} event Event from onupgradeneeded, with oldVersion 0.
      */
     function createMeta(event) {
-        var dbm, leagueStore;
+        var dbm;
         console.log("Creating meta database");
 
         dbm = event.target.result;
 
-        leagueStore = dbm.createObjectStore("leagues", {keyPath: "lid", autoIncrement: true});
+        dbm.createObjectStore("leagues", {keyPath: "lid", autoIncrement: true});
+        dbm.createObjectStore("achievements", {keyPath: "aid", autoIncrement: true});
     }
 
     /**
      * Migrate meta database to the latest structure.
-     * 
+     *
      * @param {Object} event Event from onupgradeneeded, with oldVersion > 0.
-     * @param {number} lid Integer league ID number.
      */
-    function migrateMeta(event, lid) {
-        var dbm, migrateMessage, tx;
+    function migrateMeta(event) {
+        var dbm, tx;
+
+        document.getElementById("content").innerHTML = migrateMessage;
 
         console.log("Upgrading meta database from version " + event.oldVersion + " to version " + event.newVersion);
 
-        migrateMessage = '';
-
         dbm = event.target.result;
+        tx = event.currentTarget.transaction;
+        tx.onabort = abortHandler;
 
         if (event.oldVersion <= 1) {
             dbm.deleteObjectStore("teams");
-
-            migrateMessage = '<p><strong>New in version 3.0.0-beta.2:</strong> injuries, more refined economic/financial simulations, improved contract negotiations, noise in displayed player ratings dependent on your scouting budget, and annual interactions with the owner of the team including the possibility of being fired for poor performance.</p>' + migrateMessage;
         }
 
-        if (event.oldVersion <= 2) {
-            migrateMessage = '<p><strong>New in version 3.0.0-beta.3:</strong> draft lottery, improved trading AI, revamped team history pages, and control over playing time from the roster page.</p>' + migrateMessage;
+        if (event.oldVersion <= 5) {
+            (function () {
+                var teams;
+
+                // Old team names
+                teams = [
+                    {region: "Atlanta", name: "Herons"},
+                    {region: "Boston", name: "Clovers"},
+                    {region: "Brooklyn", name: "Nests"},
+                    {region: "Charlotte", name: "Bay Cats"},
+                    {region: "Chicago", name: "Bullies"},
+                    {region: "Cleveland", name: "Cobras"},
+                    {region: "Dallas", name: "Mares"},
+                    {region: "Denver", name: "Ninjas"},
+                    {region: "Detroit", name: "Pumps"},
+                    {region: "Golden State", name: "War Machine"},
+                    {region: "Houston", name: "Rock Throwers"},
+                    {region: "Indiana", name: "Passers"},
+                    {region: "Los Angeles", name: "Cutters"},
+                    {region: "Los Angeles", name: "Lagoons"},
+                    {region: "Memphis", name: "Growls"},
+                    {region: "Miami", name: "Heatwave"},
+                    {region: "Milwaukee", name: "Buccaneers"},
+                    {region: "Minnesota", name: "Trees"},
+                    {region: "New Orleans", name: "Peloteros"},
+                    {region: "New York", name: "Knights"},
+                    {region: "Oklahoma City", name: "Tornados"},
+                    {region: "Orlando", name: "Mystery"},
+                    {region: "Philadelphia", name: "Steaks"},
+                    {region: "Phoenix", name: "Stars"},
+                    {region: "Portland", name: "Trailer Park"},
+                    {region: "Sacramento", name: "Killers"},
+                    {region: "San Antonio", name: "Spurts"},
+                    {region: "Toronto", name: "Ravens"},
+                    {region: "Utah", name: "Jugglers"},
+                    {region: "Washington", name: "Witches"}
+                ];
+
+                tx.objectStore("leagues").openCursor().onsuccess = function (event) {
+                    var cursor, l;
+
+                    cursor = event.target.result;
+                    if (cursor) {
+                        l = cursor.value;
+                        if (l.teamName === undefined) {
+                            l.teamName = teams[l.tid].name;
+                        }
+                        if (l.teamRegion === undefined) {
+                            l.teamRegion = teams[l.tid].region;
+                        }
+                        cursor.update(l);
+                        cursor.continue();
+                    }
+                };
+            }());
         }
 
-        if (event.oldVersion <= 3) {
-            migrateMessage = '<p><strong>New in version 3.0.0:</strong> export rosters for use in other leagues, import custom rosters, and view players selected to the Hall of Fame.</p>' + migrateMessage;
+        if (event.oldVersion <= 6) {
+            (function () {
+                dbm.createObjectStore("achievements", {keyPath: "aid", autoIncrement: true});
+            }());
         }
-
-        if (event.oldVersion <= 4) {
-            migrateMessage = '<p><strong>New in version 3.1.0:</strong> better AI from opposing managers and more trade functionality, including trading draft picks and asking for counter-proposals from the team you\'re trading with.</p>' + migrateMessage;
-        }
-
-        $("#content").before('<div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button>' + migrateMessage + '</div>');
     }
 
-    function connectMeta(cb) {
-        var request;
+    function connectMeta() {
+        return new Promise(function (resolve, reject) {
+            var request;
 
 //        console.log('Connecting to database "meta"');
-        request = indexedDB.open("meta", 5);
-        request.onerror = function (event) {
-            throw new Error("Meta connection error");
-        };
-        request.onblocked = function () { g.dbm.close(); };
-        request.onupgradeneeded = function (event) {
-            if (event.oldVersion === 0) {
-                createMeta(event);
-            } else {
-                migrateMeta(event);
-            }
-        };
-        request.onsuccess = function (event) {
-            g.dbm = request.result;
-            g.dbm.onerror = function (event) {
-                if (event.target.webkitErrorMessage) {
-                    throw new Error("Meta database error: " + event.target.webkitErrorMessage);
+            request = indexedDB.open("meta", 7);
+            request.onerror = function (event) {
+                reject(event.target.error);
+            };
+            request.onblocked = function () {
+                window.alert("Please close all other tabs with this site open!");
+            };
+            request.onupgradeneeded = function (event) {
+                if (event.oldVersion === 0) {
+                    createMeta(event);
                 } else {
-                    throw new Error("Meta database error: " + event.target.errorCode);
+                    migrateMeta(event);
                 }
             };
-            cb();
-        };
+            request.onabort = abortHandler;
+            request.onsuccess = function () {
+                g.dbm = request.result;
+                g.dbm.onerror = function (event) {
+                    console.log(event);
+                    throw event.target.error;
+                };
+                g.dbm.onabort = abortHandler;
+                resolve();
+            };
+        });
     }
 
     /**
      * Create a new league database with the latest structure.
-     * 
+     *
      * @param {Object} event Event from onupgradeneeded, with oldVersion 0.
      * @param {number} lid Integer league ID number for new league.
      */
     function createLeague(event, lid) {
-        var awardsStore, dbl, draftPickStore, draftOrderStore, gameAttributesStore, gameStore, messagesStore, playerStore, playoffSeriesStore, releasedPlayersStore, scheduleStore, teamStore, tradeStore;
+        var dbl, draftPickStore, eventStore, gameStore, playerFeatStore, playerStatsStore, playerStore, releasedPlayerStore;
 
         console.log("Creating league" + lid + " database");
 
@@ -99,49 +171,61 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
 
         // rid ("row id") is used as the keyPath for objects without an innate unique identifier
         playerStore = dbl.createObjectStore("players", {keyPath: "pid", autoIncrement: true});
-        teamStore = dbl.createObjectStore("teams", {keyPath: "tid"});
+        playerStatsStore = dbl.createObjectStore("playerStats", {keyPath: "psid", autoIncrement: true});
+        dbl.createObjectStore("teams", {keyPath: "tid"});
         gameStore = dbl.createObjectStore("games", {keyPath: "gid"});
-        scheduleStore = dbl.createObjectStore("schedule", {keyPath: "gid", autoIncrement: true});
-        playoffSeriesStore = dbl.createObjectStore("playoffSeries", {keyPath: "season"});
-        releasedPlayersStore = dbl.createObjectStore("releasedPlayers", {keyPath: "rid", autoIncrement: true});
-        awardsStore = dbl.createObjectStore("awards", {keyPath: "season"});
-        tradeStore = dbl.createObjectStore("trade", {keyPath: "rid"});
-        draftOrderStore = dbl.createObjectStore("draftOrder", {keyPath: "rid"});
-        draftOrderStore = dbl.createObjectStore("negotiations", {keyPath: "pid"});
-        gameAttributesStore = dbl.createObjectStore("gameAttributes", {keyPath: "key"});
-        messagesStore = dbl.createObjectStore("messages", {keyPath: "mid", autoIncrement: true});
+        dbl.createObjectStore("schedule", {keyPath: "gid", autoIncrement: true});
+        dbl.createObjectStore("playoffSeries", {keyPath: "season"});
+        releasedPlayerStore = dbl.createObjectStore("releasedPlayers", {keyPath: "rid", autoIncrement: true});
+        dbl.createObjectStore("awards", {keyPath: "season"});
+        dbl.createObjectStore("trade", {keyPath: "rid"});
+        dbl.createObjectStore("draftOrder", {keyPath: "rid"});
+        dbl.createObjectStore("negotiations", {keyPath: "pid"});
+        dbl.createObjectStore("gameAttributes", {keyPath: "key"});
+        dbl.createObjectStore("messages", {keyPath: "mid", autoIncrement: true});
         draftPickStore = dbl.createObjectStore("draftPicks", {keyPath: "dpid", autoIncrement: true});
+        eventStore = dbl.createObjectStore("events", {keyPath: "eid", autoIncrement: true});
+        playerFeatStore = dbl.createObjectStore("playerFeats", {keyPath: "fid", autoIncrement: true});
 
         playerStore.createIndex("tid", "tid", {unique: false});
         playerStore.createIndex("draft.year", "draft.year", {unique: false});
         playerStore.createIndex("retiredYear", "retiredYear", {unique: false});
         playerStore.createIndex("statsTids", "statsTids", {unique: false, multiEntry: true});
+        playerStatsStore.createIndex("pid, season, tid", ["pid", "season", "tid"], {unique: false}); // Would be unique if indexed on playoffs too, but that is a boolean and introduces complications... maybe worth fixing though? No, player could get traded back to same team in one season
 //        gameStore.createIndex("tids", "tids", {unique: false, multiEntry: true}); // Not used because currently the season index is used. If multiple indexes are eventually supported, then use this too.
         gameStore.createIndex("season", "season", {unique: false});
-        releasedPlayersStore.createIndex("tid", "tid", {unique: false});
-        releasedPlayersStore.createIndex("contract.exp", "contract.exp", {unique: false});
+        releasedPlayerStore.createIndex("tid", "tid", {unique: false});
+        releasedPlayerStore.createIndex("contract.exp", "contract.exp", {unique: false});
         draftPickStore.createIndex("season", "season", {unique: false});
         draftPickStore.createIndex("tid", "tid", {unique: false});
+        eventStore.createIndex("season", "season", {unique: false});
+        eventStore.createIndex("pids", "pids", {unique: false, multiEntry: true});
+        playerFeatStore.createIndex("pid", "pid", {unique: false});
+        playerFeatStore.createIndex("tid", "tid", {unique: false});
+//        eventStore.createIndex("tids", "tids", {unique: false, multiEntry: true}); // Not used currently, but might need to be added later
     }
 
     /**
      * Migrate a league database to the latest structure.
-     * 
+     *
      * @param {Object} event Event from onupgradeneeded, with oldVersion > 0.
      * @param {number} lid Integer league ID number.
      */
     function migrateLeague(event, lid) {
         var dbl, teams, tx;
 
+        document.getElementById("content").innerHTML = migrateMessage;
+
         console.log("Upgrading league" + lid + " database from version " + event.oldVersion + " to version " + event.newVersion);
 
         dbl = event.target.result;
         tx = event.currentTarget.transaction;
+        tx.onabort = abortHandler;
 
         // Make sure game attributes (i.e. g.startingSeason) are loaded first
-        loadGameAttributes(event.currentTarget.transaction, function () {
+        require("core/league").loadGameAttributes(tx).then(function () {
             if (event.oldVersion <= 1) {
-                teams = teams = helpers.getTeams();
+                teams = helpers.getTeamsDefault();
 
                 tx.objectStore("gameAttributes").put({
                     key: "ownerMood",
@@ -284,23 +368,23 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
 
                         t.budget = {
                             ticketPrice: {
-                                amount: helpers.round(25 + 25 * (30 - teams[t.tid].popRank) / 29, 2),
+                                amount: helpers.round(25 + 25 * (g.numTeams - teams[t.tid].popRank) / (g.numTeams - 1), 2),
                                 rank: teams[t.tid].popRank
                             },
                             scouting: {
-                                amount: helpers.round(900 + 900 * (30 - teams[t.tid].popRank) / 29) * 10,
+                                amount: helpers.round(900 + 900 * (g.numTeams - teams[t.tid].popRank) / (g.numTeams - 1)) * 10,
                                 rank: teams[t.tid].popRank
                             },
                             coaching: {
-                                amount: helpers.round(900 + 900 * (30 - teams[t.tid].popRank) / 29) * 10,
+                                amount: helpers.round(900 + 900 * (g.numTeams - teams[t.tid].popRank) / (g.numTeams - 1)) * 10,
                                 rank: teams[t.tid].popRank
                             },
                             health: {
-                                amount: helpers.round(900 + 900 * (30 - teams[t.tid].popRank) / 29) * 10,
+                                amount: helpers.round(900 + 900 * (g.numTeams - teams[t.tid].popRank) / (g.numTeams - 1)) * 10,
                                 rank: teams[t.tid].popRank
                             },
                             facilities: {
-                                amount: helpers.round(900 + 900 * (30 - teams[t.tid].popRank) / 29) * 10,
+                                amount: helpers.round(900 + 900 * (g.numTeams - teams[t.tid].popRank) / (g.numTeams - 1)) * 10,
                                 rank: teams[t.tid].popRank
                             }
                         };
@@ -416,7 +500,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
                     cursor = event.target.result;
                     if (cursor) {
                         p = cursor.value;
-                        if (p.tid === g.PLAYER.RETIRED && player.madeHof(p)) {
+                        if (p.tid === g.PLAYER.RETIRED && require("core/player").madeHof(p)) {
                             p.hof = true;
                             p.awards.push({season: g.season, type: "Inducted into the Hall of Fame"});
                         } else {
@@ -471,7 +555,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
                     draftPickStore.createIndex("season", "season", {unique: false});
                     draftPickStore.createIndex("tid", "tid", {unique: false});
 
-                    teams = helpers.getTeams();
+                    teams = helpers.getTeamsDefault();
 
                     if (g.phase >= g.PHASE.DRAFT) {
                         offset = 1;
@@ -480,7 +564,7 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
                     }
 
                     for (i = offset; i < 4 + offset; i++) {
-                        for (t = 0; t < 30; t++) {
+                        for (t = 0; t < g.numTeams; t++) {
                             for (round = 1; round <= 2; round++) {
                                 draftPickStore.add({
                                     tid: t,
@@ -495,365 +579,416 @@ define(["globals", "core/player", "lib/davis", "lib/jquery", "lib/underscore", "
                     }
                 }());
             }
-        });
-    }
+            if (event.oldVersion <= 5) {
+                tx.objectStore("players").openCursor().onsuccess = function (event) {
+                    var cursor, i, p;
 
-    function connectLeague(lid, cb) {
-        var request;
+                    cursor = event.target.result;
+                    if (cursor) {
+                        p = cursor.value;
 
-//        console.log('Connecting to database "league' + lid + '"');
-        request = indexedDB.open("league" + lid, 5);
-        request.onerror = function (event) {
-            throw new Error("League connection error");
-        };
-        request.onblocked = function () { g.dbl.close(); };
-        request.onupgradeneeded = function (event) {
-            if (event.oldVersion === 0) {
-                createLeague(event, lid);
-            } else {
-                migrateLeague(event, lid);
-            }
-        };
-        request.onsuccess = function (event) {
-            g.dbl = request.result;
-            g.dbl.onerror = function (event) {
-//console.log(event);
-                if (event.target.webkitErrorMessage) {
-                    throw new Error("League database error: " + event.target.webkitErrorMessage);
-                } else {
-                    throw new Error("League database error: " + event.target.errorCode);
-                }
-            };
-            cb();
-        };
-    }
+                        if (!p.hasOwnProperty("imgURL")) {
+                            p.imgURL = "";
+                        }
 
-    /**
-     * Get an object store or transaction based on input which may be the desired object store, a transaction to be used, or null.
-     * 
-     * This allows for the convenient use of transactions or object stores that have already been defined, which is often necessary.
-     * 
-     * @memberOf db
-     * @param {(IDBObjectStore|IDBTransaction|null)} ot An IndexedDB object store or transaction to be used; if null is passed, then a new transaction will be used.
-     * @param {(string|Array.<string>)} transactionObjectStores The object stores to open a transaction with, if necessary.
-     * @param {?string} objectStore The object store to return. If null, return a transaction.
-     * @param {boolean=} readwrite Should the transaction be readwrite or not? This only applies when a new transaction is created here (i.e. no transaction or objectStore is passed). Default false.
-     * @return {(IDBObjectStore|IDBTransaction)} The requested object store or transaction.
-     */
-    function getObjectStore(ot, transactionObjectStores, objectStore, readwrite) {
-        readwrite = readwrite !== undefined ? readwrite : false;
-
-        if (ot instanceof IDBTransaction) {
-            if (objectStore !== null) {
-                return ot.objectStore(objectStore);
-            }
-            return ot; // Return original transaction
-        }
-
-        // Return a transaction
-        if (objectStore === null) {
-            if (ot instanceof IDBObjectStore) {
-                return ot.transaction;
-            }
-
-            if (readwrite) {
-                return g.dbl.transaction(transactionObjectStores, "readwrite");
-            }
-            return g.dbl.transaction(transactionObjectStores);
-        }
-
-        // ot is an objectStore already, and an objectStore was requested (not a transation)
-        if (ot instanceof IDBObjectStore) {
-            return ot;
-        }
-
-
-        if (readwrite) {
-            return g.dbl.transaction(transactionObjectStores, "readwrite").objectStore(objectStore);
-        }
-        return g.dbl.transaction(transactionObjectStores).objectStore(objectStore);
-    }
-
-    /**
-     * Gets all the contracts a team owes.
-     * 
-     * This includes contracts for players who have been released but are still owed money.
-     * 
-     * @memberOf db
-     * @param {IDBTransaction|null} ot An IndexedDB transaction on players and releasedPlayers; if null is passed, then a new transaction will be used.
-     * @param {number} tid Team ID.
-     * @param {function(Array)} cb Callback whose first argument is an array of objects containing contract information.
-     */
-    function getContracts(ot, tid, cb) {
-        var contracts, transaction;
-
-        transaction = getObjectStore(ot, ["players", "releasedPlayers"], null);
-
-        // First, get players currently on the roster
-        transaction.objectStore("players").index("tid").getAll(tid).onsuccess = function (event) {
-            var i, players;
-
-            contracts = [];
-            players = event.target.result;
-            for (i = 0; i < players.length; i++) {
-                contracts.push({
-                    pid: players[i].pid,
-                    name: players[i].name,
-                    skills: _.last(players[i].ratings).skills,
-                    injury: players[i].injury,
-                    amount: players[i].contract.amount,
-                    exp: players[i].contract.exp,
-                    released: false
-                });
-            }
-
-            // Then, get any released players still owed money
-            transaction.objectStore("releasedPlayers").index("tid").getAll(tid).onsuccess = function (event) {
-                var i, releasedPlayers;
-
-                releasedPlayers = event.target.result;
-
-                if (releasedPlayers.length === 0) {
-                    return cb(contracts);
-                }
-
-                for (i = 0; i < releasedPlayers.length; i++) {
-                    (function (i) {
-                        transaction.objectStore("players").get(releasedPlayers[i].pid).onsuccess = function (event) {
-                            var player;
-
-                            player = event.target.result;
-                            contracts.push({
-                                pid: player.pid,
-                                name: player.name,
-                                skills: _.last(player.ratings).skills,
-                                injury: player.injury,
-                                amount: releasedPlayers[i].contract.amount,
-                                exp: releasedPlayers[i].contract.exp,
-                                released: true
-                            });
-
-                            if (contracts.length === players.length + releasedPlayers.length) {
-                                cb(contracts);
+                        for (i = 0; i < p.stats.length; i++) {
+                            if (!p.stats[i].hasOwnProperty("ewa")) {
+                                p.stats[i].ewa = p.stats[i].min * (p.stats[i].per - 11) / 67 / 30 * 0.8;
                             }
-                        };
-                    }(i));
-                }
-            };
-        };
-    }
+                        }
 
-    /**
-     * Get the total payroll for a team.
-     * 
-     * This includes players who have been released but are still owed money from their old contracts.
-     * 
-     * @memberOf db
-     * @param {IDBTransaction|null} ot An IndexedDB transaction on players and releasedPlayers; if null is passed, then a new transaction will be used.
-     * @param {number} tid Team ID.
-     * @param {function(number, Array=)} cb Callback; first argument is the payroll in thousands of dollars, second argument is the list of contract objects from getContracts.
-     */
-    function getPayroll(ot, tid, cb) {
-        if (tid === undefined) {
-            cb(0, []);
-            return console.log('ERROR: db.getPayroll needs a TID!')
-        }
-        getContracts(ot, tid, function (contracts) {
-            var i, payroll;
-
-            payroll = 0;
-            for (i = 0; i < contracts.length; i++) {
-                payroll += contracts[i].amount;  // No need to check exp, since anyone without a contract for the current season will not have an entry
-            }
-
-            cb(payroll, contracts);
-        });
-    }
-
-    /**
-     * Get the total payroll for every team team.
-     * 
-     * @memberOf db
-     * @param {function(Array.<number>)} cb Callback whose first argument is an array of payrolls, ordered by team id.
-     */
-    function getPayrolls(cb) {
-        var i, localGetPayroll, payrolls, tx;
-
-        payrolls = [];
-        localGetPayroll = function (tx, tid) {
-            getPayroll(tx, tid, function (payroll) {
-                payrolls[tid] = payroll;
-            });
-        };
-
-        // First, get all the current payrolls
-        tx = g.dbl.transaction(["players", "releasedPlayers"]);
-        for (i = 0; i < g.numTeams; i++) {
-            localGetPayroll(tx, i);
-        }
-        tx.oncomplete = function () {
-            cb(payrolls);
-        };
-    }
-
-    /**
-     * Load a game attribute from the database and update the global variable g.
-     *
-     * @param {(IDBObjectStore|IDBTransaction|null)} ot An IndexedDB object store or transaction on gameAttributes; if null is passed, then a new transaction will be used.
-     * @param {string} key Key in gameAttributes to load the value for.
-     * @param {function()=} cb Optional callback.
-     */
-    function loadGameAttribute(ot, key, cb) {
-        var gameAttributesStore;
-
-        gameAttributesStore = getObjectStore(ot, "gameAttributes", "gameAttributes");
-
-        gameAttributesStore.get(key).onsuccess = function (event) {
-            g[key] = event.target.result.value;
-
-            if (cb !== undefined) {
-                cb();
-            }
-        };
-    }
-
-    /**
-     * Load game attributes from the database and update the global variable g.
-     * 
-     * @param {(IDBObjectStore|IDBTransaction|null)} ot An IndexedDB object store or transaction on gameAttributes; if null is passed, then a new transaction will be used.
-     * @param {function()=} cb Optional callback.
-     */
-    function loadGameAttributes(ot, cb) {
-        var gameAttributesStore;
-
-        gameAttributesStore = getObjectStore(ot, "gameAttributes", "gameAttributes");
-
-        gameAttributesStore.getAll().onsuccess = function (event) {
-            var i, gameAttributes;
-
-            gameAttributes = event.target.result;
-
-            for (i = 0; i < gameAttributes.length; i++) {
-                g[gameAttributes[i].key] = gameAttributes[i].value;
-            }
-
-            if (cb !== undefined) {
-                cb();
-            }
-        };
-    }
-
-    /**
-     * Set values in the gameAttributes objectStore and update the global variable g.
-     *
-     * Items stored in gameAttributes are globally available through the global variable g. If a value is a constant across all leagues/games/whatever, it should just be set in globals.js instead.
-     * 
-     * @param {Object} gameAttributes Each property in the object will be inserted/updated in the database with the key of the object representing the key in the database.
-     * @param {function()=} cb Optional callback.
-     */
-    function setGameAttributes(gameAttributes, cb) {
-        var gameAttributesStore, i, key, toUpdate, tx;
-
-        toUpdate = [];
-        for (key in gameAttributes) {
-            if (gameAttributes.hasOwnProperty(key)) {
-                if (g[key] !== gameAttributes[key]) {
-                    toUpdate.push(key);
-                }
-            }
-        }
-
-        tx = g.dbl.transaction("gameAttributes", "readwrite");
-        gameAttributesStore = tx.objectStore("gameAttributes");
-
-        for (i = 0; i < toUpdate.length; i++) {
-            key = toUpdate[i];
-            (function (key) {
-                gameAttributesStore.put({key: key, value: gameAttributes[key]}).onsuccess = function (event) {
-                    g[key] = gameAttributes[key];
+                        cursor.update(p);
+                        cursor.continue();
+                    }
                 };
 
-                // Trigger a signal for the team finances view. This is stupid.
-                if (key === "gamesInProgress") {
-                    if (gameAttributes[key]) {
-                        $("#finances-settings").trigger("gameSimulationStart");
-                    } else {
-                        $("#finances-settings").trigger("gameSimulationStop");
+                tx.objectStore("teams").getAll().onsuccess = function (event) {
+                    var teams;
+
+                    teams = event.target.result;
+
+                    tx.objectStore("gameAttributes").put({
+                        key: "teamAbbrevsCache",
+                        value: _.pluck(teams, "abbrev")
+                    });
+                    tx.objectStore("gameAttributes").put({
+                        key: "teamRegionsCache",
+                        value: _.pluck(teams, "region")
+                    });
+                    tx.objectStore("gameAttributes").put({
+                        key: "teamNamesCache",
+                        value: _.pluck(teams, "name")
+                    });
+                };
+
+                tx.objectStore("games").openCursor().onsuccess = function (event) {
+                    var cursor, game, i, j, update;
+
+                    cursor = event.target.result;
+                    if (cursor) {
+                        game = cursor.value;
+                        update = false;
+
+                        for (i = 0; i < game.teams.length; i++) {
+                            // Fix ptsQtrs for old games where this wasn't stored
+                            if (game.teams[i].ptsQtrs === undefined) {
+                                game.teams[i].ptsQtrs = ["-", "-", "-", "-"];
+                                for (j = 0; j < game.overtimes; j++) {
+                                    game.teams[i].ptsQtrs.push("-");
+                                }
+                                update = true;
+                            }
+                        }
+
+                        if (update) {
+                            cursor.update(game);
+                        }
+
+                        cursor.continue();
                     }
+                };
+            }
+            if (event.oldVersion <= 6) {
+                tx.objectStore("trade").put({
+                    rid: 0,
+                    teams: [
+                        {
+                            tid: g.userTid,
+                            pids: [],
+                            dpids: []
+                        },
+                        {
+                            tid: g.userTid === 0 ? 1 : 0,  // Load initial trade view with the lowest-numbered non-user team (so, either 0 or 1).
+                            pids: [],
+                            dpids: []
+                        }
+                    ]
+                });
+            }
+            if (event.oldVersion <= 7) {
+                (function () {
+                    var eventStore;
+
+                    eventStore = dbl.createObjectStore("events", {keyPath: "eid", autoIncrement: true});
+                    eventStore.createIndex("season", "season", {unique: false});
+                }());
+            }
+            if (event.oldVersion <= 8) {
+                (function () {
+                    tx.objectStore("gameAttributes").put({
+                        key: "gracePeriodEnd",
+                        value: g.startingSeason + 2
+                    });
+                }());
+            }
+            if (event.oldVersion <= 9) {
+                (function () {
+                    var draft;
+
+                    draft = require("core/draft");
+                    draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3).then(function () {
+                        return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_2);
+                    }).then(function () {
+                        return dao.players.count({
+                            ot: tx,
+                            index: "tid",
+                            key: g.PLAYER.UNDRAFTED
+                        });
+                    }).then(function (numPlayersUndrafted) {
+                        if (numPlayersUndrafted === 0) {
+                            return draft.genPlayers(tx, g.PLAYER.UNDRAFTED);
+                        }
+                    });
+                }());
+            }
+            if (event.oldVersion <= 10) {
+                (function () {
+                    var playerStatsStore;
+
+                    // Create new playerStats object store
+                    playerStatsStore = dbl.createObjectStore("playerStats", {keyPath: "psid", autoIncrement: true});
+                    playerStatsStore.createIndex("pid, season, tid", ["pid", "season", "tid"], {unique: false});
+
+                    // For each player, add all his stats to playerStats store, delete his stats from player object, and rewrite player object
+                    tx.objectStore("players").openCursor().onsuccess = function (event) {
+                        var addStatsRows, afterStatsRows, cursor, p;
+
+                        cursor = event.target.result;
+                        if (cursor) {
+                            p = cursor.value;
+
+                            // watch is now mandatory!
+                            if (!p.hasOwnProperty("watch")) {
+                                p.watch = false;
+                            }
+
+                            afterStatsRows = function () {
+                                // Save player object without stats and with values
+                                delete p.stats;
+                                require("core/player").updateValues(tx, p, []).then(function (p) {
+                                    cursor.update(p);
+
+                                    cursor.continue();
+                                });
+                            };
+
+                            addStatsRows = function () {
+                                var ps;
+
+                                ps = p.stats.shift();
+
+                                ps.pid = p.pid;
+
+                                // Could be calculated correctly if I wasn't lazy
+                                ps.yearsWithTeam = 0;
+
+                                tx.objectStore("playerStats").add(ps).onsuccess = function () {
+                                    // On to the next one
+                                    if (p.stats.length > 0) {
+                                        addStatsRows();
+                                    } else {
+                                        afterStatsRows();
+                                    }
+                                };
+                            };
+
+                            if (p.stats.length > 0) {
+                                addStatsRows();
+                            } else {
+                                afterStatsRows();
+                            }
+                        }
+                    };
+                }());
+            }
+            if (event.oldVersion <= 11) {
+                (function () {
+                    tx.objectStore("events").createIndex("pids", "pids", {unique: false, multiEntry: true});
+                }());
+            }
+            if (event.oldVersion <= 12) {
+                (function () {
+                    var playerFeatStore;
+                    playerFeatStore = dbl.createObjectStore("playerFeats", {keyPath: "fid", autoIncrement: true});
+                    playerFeatStore.createIndex("pid", "pid", {unique: false});
+                    playerFeatStore.createIndex("tid", "tid", {unique: false});
+                }());
+            }
+            if (event.oldVersion <= 13) {
+                (function () {
+                    tx.objectStore("gameAttributes").put({
+                        key: "userTids",
+                        value: [g.userTid]
+                    });
+                    if (g.numTeams === undefined) {
+                        tx.objectStore("gameAttributes").put({
+                            key: "numTeams",
+                            value: 30
+                        });
+                    }
+                    if (g.godMode === undefined) {
+                        tx.objectStore("gameAttributes").put({
+                            key: "godMode",
+                            value: false
+                        });
+                    }
+                    if (g.godModeInPast === undefined) {
+                        tx.objectStore("gameAttributes").put({
+                            key: "godModeInPast",
+                            value: false
+                        });
+                    }
+                    if (g.phaseChangeInProgress === undefined) {
+                        tx.objectStore("gameAttributes").put({
+                            key: "phaseChangeInProgress",
+                            value: false
+                        });
+                    }
+                    if (g.autoPlaySeasons === undefined) {
+                        tx.objectStore("gameAttributes").put({
+                            key: "autoPlaySeasons",
+                            value: 0
+                        });
+                    }
+                }());
+            }
+            if (event.oldVersion <= 14) {
+                (function () {
+                    tx.objectStore("games").openCursor().onsuccess = function (event) {
+                        var cursor, game, i, j, update;
+
+                        cursor = event.target.result;
+                        update = false;
+
+                        if (cursor) {
+                            game = cursor.value;
+
+                            // set BA, +/- to zero for boxscores
+                            for (i = 0; i < game.teams.length; i++) {
+                                for (j = 0; j < game.teams[i].players.length; j++) {
+                                    if (game.teams[i].players[j].ba === undefined) {
+                                        game.teams[i].players[j].ba = 0;
+                                        update = true;
+                                    }
+                                    if (game.teams[i].players[j].pm === undefined) {
+                                        game.teams[i].players[j].pm = 0;
+                                        update = true;
+                                    }
+                                }
+                            }
+
+                            if (game.teams[0].ba === undefined) {
+                                game.teams[0].ba = 0;
+                                game.teams[1].ba = 0;
+                                update = true;
+                            }
+
+                            if (update) { cursor.update(game); }
+                            cursor.continue();
+                        }
+                    };
+
+                    // set BA, +/- to zero for player stats
+                    tx.objectStore("playerStats").openCursor().onsuccess = function (event) {
+                        var cursor, ps, update;
+
+                        cursor = event.target.result;
+                        update = false;
+
+                        if (cursor) {
+                            ps = cursor.value;
+
+                            if (!ps.hasOwnProperty("ba")) {
+                                ps.ba = 0;
+                                update = true;
+                            }
+                            if (!ps.hasOwnProperty("pm")) {
+                                ps.pm = 0;
+                                update = true;
+                            }
+
+                            if (update) { cursor.update(ps); }
+                            cursor.continue();
+                        }
+                    };
+
+                    // set BA to zero for team stats, +/- already handled
+                    tx.objectStore("teams").openCursor().onsuccess = function (event) {
+                        var cursor, i, t, update;
+
+                        cursor = event.target.result;
+                        update = false;
+
+                        if (cursor) {
+                            t = cursor.value;
+                            for (i = 0; i < t.stats.length; i++) {
+                                if (!t.stats[i].hasOwnProperty("ba")) {
+                                    t.stats[i].ba = 0;
+                                    update = true;
+                                }
+                            }
+
+                            if (update) { cursor.update(t); }
+                            cursor.continue();
+                        }
+                    };
+                }());
+            }
+            if (event.oldVersion <= 15) {
+                (function () {
+                    // Put pos in ratings rather than root of player objects, so users can see it change over time
+                    tx.objectStore("players").openCursor().onsuccess = function (event) {
+                        var cursor, i, p;
+
+                        cursor = event.target.result;
+
+                        if (cursor) {
+                            p = cursor.value;
+                            for (i = 0; i < p.ratings.length; i++) {
+                                p.ratings[i].pos = p.pos;
+                            }
+                            delete p.pos;
+
+                            cursor.update(p);
+                            cursor.continue();
+                        }
+                    };
+                }());
+            }
+        });
+    }
+
+    function connectLeague(lid) {
+        return new Promise(function (resolve, reject) {
+            var request;
+
+//        console.log('Connecting to database "league' + lid + '"');
+            request = indexedDB.open("league" + lid, 16);
+            request.onerror = function (event) {
+                reject(event.target.error);
+            };
+            request.onblocked = function () {
+                window.alert("Please close all other tabs with this site open!");
+            };
+            request.onupgradeneeded = function (event) {
+                if (event.oldVersion === 0) {
+                    createLeague(event, lid);
+                } else {
+                    migrateLeague(event, lid);
                 }
-            }(key));
-        }
-
-        tx.oncomplete = function () {
-            // Trigger signal for the team finances view again, or else sometimes it gets stuck. This is even more stupid.
-            if (gameAttributes.hasOwnProperty("gamesInProgress") && gameAttributes.gamesInProgress) {
-                $("#finances-settings").trigger("gameSimulationStart");
-            } else if (gameAttributes.hasOwnProperty("gamesInProgress") && !gameAttributes.gamesInProgress) {
-                $("#finances-settings").trigger("gameSimulationStop");
-            }
-
-            if (cb !== undefined) {
-                cb();
-            }
-        };
+            };
+            request.onabort = abortHandler;
+            request.onsuccess = function () {
+                g.dbl = request.result;
+                g.dbl.onerror = function (event) {
+                    console.log(event);
+                    throw event.target.error;
+                };
+                g.dbl.onabort = abortHandler;
+                resolve();
+            };
+        });
     }
 
     function reset() {
-        var key;
+        var debug, key;
 
         // localStorage, which is just use for table sorting currently
+        debug = localStorage.debug; // Save debug setting and restore later
         for (key in localStorage) {
             if (localStorage.hasOwnProperty(key)) {
                 localStorage.removeItem(key);
             }
         }
+        localStorage.debug = debug;
 
         // Delete any current league databases
         console.log("Deleting any current league databases...");
-        g.dbm.transaction("leagues").objectStore("leagues").getAll().onsuccess = function (event) {
-            var data, done, i, league, leagues, request;
-
-            leagues = event.target.result;
-
+        dao.leagues.getAll().then(function (leagues) {
             if (leagues.length === 0) {
                 console.log('No leagues found.');
                 Davis.location.assign(new Davis.Request("/"));
             }
 
-            league = require("core/league"); // Circular reference
+            Promise.map(leagues, function (l) {
+                return require("core/league").remove(l.lid);
+            }, {concurrency: Infinity}).then(function () {
+                var request;
 
-            done = 0;
-            for (i = 0; i < leagues.length; i++) {
-                league.remove(leagues[i].lid, function () {
-                    done += 1;
-                    if (done === leagues.length) {
-                        // Delete any current meta database
-                        console.log("Deleting any current meta database...");
-                        g.dbm.close();
-                        request = indexedDB.deleteDatabase("meta");
-                        request.onsuccess = function (event) {
-                            // Create new meta database
-                            console.log("Creating new meta database...");
-                            connectMeta(function () {
-                                console.log("Done!");
-                                Davis.location.assign(new Davis.Request("/"));
-                            });
-                        };
-                    }
-                });
-            }
-        };
+                // Delete any current meta database
+                console.log("Deleting any current meta database...");
+                g.dbm.close();
+                request = indexedDB.deleteDatabase("meta");
+                request.onsuccess = function () {
+                    location.reload();
+                };
+            });
+        });
     }
 
     return {
         connectMeta: connectMeta,
         connectLeague: connectLeague,
-        getObjectStore: getObjectStore,
-        getPayroll: getPayroll,
-        getPayrolls: getPayrolls,
-        loadGameAttribute: loadGameAttribute,
-        loadGameAttributes: loadGameAttributes,
-        setGameAttributes: setGameAttributes,
         reset: reset
     };
 });

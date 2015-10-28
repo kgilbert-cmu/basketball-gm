@@ -1,0 +1,39 @@
+{
+  "name": "basketball-gm",
+  "version": "3.4.0",
+  "description": "A single-player basketball simulation game. Make trades, set rosters, draft players, and try to build the next dynasty, all from within your web browser. The game is implemented entirely in client-side JavaScript, backed by IndexedDB.",
+  "homepage": "http://basketball-gm.com/",
+  "bugs": {
+    "url": "https://github.com/dumbmatter/basketball-gm/issues"
+  },
+  "author": "Jeremy Scheff <jdscheff@gmail.com>",
+  "main": "js/app.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dumbmatter/basketball-gm.git"
+  },
+  "scripts": {
+    "start": "node tools/server.js",
+    "build": "node tools/build.js",
+    "build-cordova": "node tools/build.js cordova",
+    "test": "node_modules/karma/bin/karma start",
+    "lint": "node_modules/.bin/eslint js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "~0.14.1",
+    "clean-css": "~2.2.23",
+    "requirejs": "~2.1.15",
+    "replace": "~0.3.0",
+    "moment": "~2.8.4",
+    "fs-extra": "~0.14.0",
+    "karma": "~0.12.31",
+    "karma-chrome-launcher": "~0.1.7",
+    "karma-firefox-launcher": "~0.1.4",
+    "mocha": "~2.1.0",
+    "karma-mocha": "~0.1.10",
+    "karma-requirejs": "~0.2.2",
+    "express": "~4.10.7"
+  },
+  "private": true
+}

@@ -1,143 +1,252 @@
 body {
-  padding-top: 60px;
+  padding-top: 50px;
   padding-bottom: 20px;
 }
 
-/* This header stuff is basically setting the old defaults from Bootstrap 2.0 to override the new defaults from Bootstrap 2.1. */
-h1, h2, h3, h4, h5, h6 {
-  margin: 0;
+footer {
+  color: #777;
 }
-h1 { font-size: 30px; line-height: 36px; }
-h2 { font-size: 24px; line-height: 36px; }
-h3 { font-size: 18px; line-height: 27px; }
-h4 { font-size: 14px; line-height: 18px; }
-h5 { font-size: 12px; line-height: 18px; }
-h6 { font-size: 11px; line-height: 18px; }
-h1 small { font-size: 18px; }
-h2 small { font-size: 18px; }
-h3 small { font-size: 14px; }
-h4 small { font-size: 12px; }
 
-.navbar-inverse a.brand {
-  color: #fff;
+.rev {
+  font-size: 9px;
+  margin-top: -7px;
 }
-a.brand img {
+
+.navbar-brand img {
   vertical-align: top;
 }
-
-footer {
-  color: #666666;
-  text-align: center;
+.navbar-brand span {
+  padding-left: 5px;
+  float: right;
 }
 
-ul.dashboard_league {
+/* This is like navbar-text, but with different margins so two lines of text can fit, and with no responsive stuff so it always shows in the navbar. */
+.navbar-text-two-line-no-collapse {
+  color: #777777;
+  float: left;
+  margin: 6px 15px 7px 15px;
+}
+
+/* This is a copy of the navbar-nav styles, with no responsive stuff. */
+.navbar-collapse .navbar-nav-no-collapse.navbar-left:first-child {
+  margin-left: -15px;
+}
+.navbar-collapse .navbar-nav-no-collapse.navbar-right:last-child {
+  margin-right: -15px;
+}
+.navbar-nav-no-collapse {
+  margin: 8px -15px;
+}
+.navbar-nav-no-collapse > li > a {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  line-height: 18px;
+}
+.navbar-nav-no-collapse > li > .dropdown-menu {
+  margin-top: 0;
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+.navbar-nav-no-collapse {
+  float: left;
+  margin: 0;
+}
+.navbar-nav-no-collapse > li {
+  float: left;
+}
+.navbar-nav-no-collapse > li > a {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.navbar-default .navbar-nav-no-collapse > li > a {
+  color: #777777;
+}
+.navbar-default .navbar-nav-no-collapse > li > a:hover,
+.navbar-default .navbar-nav-no-collapse > li > a:focus {
+  color: #333333;
+  background-color: transparent;
+}
+.navbar-default .navbar-nav-no-collapse > .active > a,
+.navbar-default .navbar-nav-no-collapse > .active > a:hover,
+.navbar-default .navbar-nav-no-collapse > .active > a:focus {
+  color: #555555;
+  background-color: #e7e7e7;
+}
+.navbar-default .navbar-nav-no-collapse > .disabled > a,
+.navbar-default .navbar-nav-no-collapse > .disabled > a:hover,
+.navbar-default .navbar-nav-no-collapse > .disabled > a:focus {
+  color: #cccccc;
+  background-color: transparent;
+}
+.navbar-default .navbar-nav-no-collapse > .dropdown > a:hover .caret,
+.navbar-default .navbar-nav-no-collapse > .dropdown > a:focus .caret {
+  border-top-color: #333333;
+  border-bottom-color: #333333;
+}
+.navbar-default .navbar-nav-no-collapse > .open > a,
+.navbar-default .navbar-nav-no-collapse > .open > a:hover,
+.navbar-default .navbar-nav-no-collapse > .open > a:focus {
+  background-color: #e7e7e7;
+  color: #555555;
+}
+.navbar-default .navbar-nav-no-collapse > .open > a .caret,
+.navbar-default .navbar-nav-no-collapse > .open > a:hover .caret,
+.navbar-default .navbar-nav-no-collapse > .open > a:focus .caret {
+  border-top-color: #555555;
+  border-bottom-color: #555555;
+}
+.navbar-default .navbar-nav-no-collapse > .dropdown > a .caret {
+  border-top-color: #777777;
+  border-bottom-color: #777777;
+}
+
+.god-mode {
+  background-color: #563d7c !important;
+  color: #fff !important;
+}
+.god-mode:hover, .god-mode:focus {
+  background-color: #4a356b !important;
+}
+.god-mode-text {
+  padding: 0 3px;
+}
+
+/* For the user/login widget */
+.user-menu {
+  display: block;
+  padding: 16px 15px;
+  margin-right: -15px; /* No right margin, like navbar-brand's left margin */
+}
+.user-menu:hover {
+  text-decoration: none;
+}
+/* http://stackoverflow.com/a/20839087/786644 */
+.navbar-link .visible-lg {
+    display: none !important;
+}
+@media (min-width: 1200px) {
+  .navbar-link .visible-lg {
+    display: inline-block !important;
+  }
+}
+@media (max-width: 767px) {
+  .user-menu {
+    margin-left: -15px; /* Move closer to hamburger menu */
+  }
+}
+
+/* These colors are copied from the default "success" button. */
+#play-button-link {
+  color: #fff;
+  background-color: #5cb85c;
+}
+#play-button-link:hover, #play-button-link:focus {
+  background-color: #47a447;
+}
+#play-button-link b.caret {
+  border-top-color: #fff;
+}
+
+/* This is for keyboard shortcuts in dropdowns */
+.dropdown-menu > li > a {
+  position: relative;
+  padding-right: 70px;
+}
+.dropdown-menu > li > a > span.kbd {
+  position: absolute;
+  right: 20px;
+  top: 3px;
+}
+.dropdown-menu > li > a:hover > .text-muted {
+  color: #ccc;
+}
+
+ul.dashboard-boxes {
   list-style: none;
-  margin: -1em -1em 0 0;
+  margin: 0 -1em 0 0;
   padding: 0;
 }
-ul.dashboard_league li {
+ul.dashboard-boxes li {
   float: left;
   margin: 1em 1em 0 0;
   position: relative;
   overflow: hidden;
 }
-ul.dashboard_league li strong {
+ul.dashboard-boxes li strong {
   white-space: nowrap;
 }
-ul.dashboard_league li a.league {
+ul.dashboard-boxes li a.league {
   display: block;
-  height: 56px;
-  padding: 6px 8px 6px 8px;
+  height: 60px;
+  padding: 2px 8px 6px 8px;
   text-align: left;
-  width: 138px;
+  width: 151px;
 }
-ul.dashboard_league li a.league:hover {
+ul.dashboard-boxes li a.league:hover {
   color: #000;
 }
-ul.dashboard_league li form.delete .btn {
+ul.dashboard-boxes li form.delete button {
   border-radius: 0 4px 0 4px;
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 0px;
+  right: 5px;
 }
-ul.dashboard_league li.dashboard_league_new a {
+ul.dashboard-boxes li.dashboard-box-new a {
   color: #fff;
 }
-ul.dashboard_league li.dashboard_league_new a:hover {
+ul.dashboard-boxes li.dashboard-box-new a:hover {
   color: #fff;
 }
-ul.dashboard_league li.dashboard_league_new h2 {
+ul.dashboard-boxes li.dashboard-box-new h2 {
   font-size: 20px;
-  line-height: 30px;
-  margin-top: -2px;
+  line-height: 26px;
+  margin-top: 1px;
 }
 
-.sidebar-nav {
-  padding: 9px 0;
+.negotiation-team-years {
+  width: 110px;
+}
+.negotiation-team-amount {
+  width: 180px;
 }
 
-#contentwrapper {
-  float: left;
-  width: 100%;
+/* From the Bootstrap offcanvas example http://getbootstrap.com/examples/offcanvas/ */
+@media screen and (max-width: 768px) {
+  .row-offcanvas {
+    position: relative;
+  }
+  .row-offcanvas-right
+  .sidebar-offcanvas {
+    right: -100%;
+  }
+  .sidebar-offcanvas {
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
 }
-#league_content {
- margin-left: 145px;
+@media screen and (min-width: 769px) {
+  .row-offcanvas-force {
+    position: relative;
+  }
+  .row-offcanvas-right-force
+  .sidebar-offcanvas-force {
+    right: -100%;
+  }
+  .sidebar-offcanvas-force {
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
 }
-#league-menu {
-  float: left;
-  width: 125px;
-  margin-left: -100%;
-}
-.league-alert {
- margin-left: 145px;
+
+.help-icon {
+  cursor: pointer;
+  font-size: 13px;
 }
 
 table {
   white-space: nowrap;
-}
-
-div#play-menu {
-  color: #dddddd;
-  visibility: hidden;
-}
-div#play-menu ul.btn {
-  -webkit-border-top-right-radius: 0;
-  -moz-border-radius-topright: 0;
-  border-top-right-radius: 0;
-  -webkit-border-bottom-right-radius: 0;
-  -moz-border-radius-bottomright: 0;
-  border-bottom-right-radius: 0;
-  -webkit-border-top-left-radius: 0;
-  -moz-border-radius-topleft: 0;
-  border-top-left-radius: 0;
-  -webkit-border-bottom-left-radius: 0;
-  -moz-border-radius-bottomleft: 0;
-  border-bottom-left-radius: 0;
-  
-  border: 0;
-  padding: 0;
-  text-align: left;
-}
-div#play-menu ul li a {
-  text-shadow: none;
-}
-div#play-menu ul li a.dropdown-toggle {
-  background: transparent;
-  border-bottom-color: #fff;
-  border-top-color: #fff;
-  color: #FFFFFF;
-  line-height: 19px;
-  padding: 10px 10px 11px 10px;
-  text-shadow: none;
-}
-div#play-menu ul li a.dropdown-toggle:hover {
-  color: #FFFFFF;
-  text-shadow: none;
-}
-div#play-menu ul li a.dropdown-toggle .caret {
-  border-bottom-color: #fff;
-  border-top-color: #fff;
-  opacity: 0.75;
 }
 
 .table-bordered tbody tr.separator td {
@@ -150,67 +259,130 @@ div#play-menu ul li a.dropdown-toggle .caret {
   border-top: 1px solid #888;
 }
 
-table#roster td.roster_handle {
+.roster-handle {
   cursor: move;
-  width: 18px;
+  max-width: 36px;
+  min-width: 36px;
+  width: 36px;
 }
-span.roster_starter  {
-  color: #0074cc;
+.roster-starter  {
+  color: #428bca;
 }
-span.roster_bench  {
-  color: #49afcd;
-}
-
-table#game_log_list tbody tr.alert-info td, table.leaders tbody tr.alert-info td {
-  background-color: #d9edf7;
-  border-color: #bce8f1;
-  color: #3a87ad;
+.roster-bench  {
+  color: #5bc0de;
 }
 
-table#game_log_list tbody td {
+#game-log-list tbody td {
   padding: 0;
 }
 
-table#game_log_list td a {
+#game-log-list td a {
   color: #3a87ad;
   display: block;
   padding: 4px 5px 4px 5px;  /* Expand to encompass normal td padding, which was set to 0 here above. */
   text-decoration: none;
 }
 
-table#game_log_list tbody tr:hover td, table#messages tbody tr:hover td {
+#game-log-list tbody tr:hover td, #messages tbody tr:hover td {
   background-color: #d9edf7;
   border-color: #bce8f1;
   text-decoration: none;
+}
+
+.game-log-score table {
+  margin-top: 15px;
+  width: auto;
+}
+.game-log-four-factors table {
+  margin-top: 15px;
+  width: auto;
+}
+@media (min-width: 768px) {
+  .game-log-score {
+    float: left;
+    margin-right: 30px;
+  }
+  .game-log-four-factors {
+    float: left;
+  }
+}
+
+.schedule-row {
+  color: #000;
+  font-size: 16px;
+}
+.schedule-results {
+  float: left;
+  width: 135px;
+  text-align: center;
+}
+.schedule-wl {
+  font-size: 22px;
+  text-decoration: underline;
+  width: 26px;
+  float: left;
+  text-align: center;
+}
+.schedule-score {
+  margin-left: 6px;
+  font-size: 14px;
+  line-height: 36px; /* so bottom aligns despite float */
+}
+.schedule-at {
+  font-size: 22px;
 }
 
 .table-nonfluid {
    width: auto;
 }
 
-
+/* Auto width seems to work well..
 select.season {
-  width: 120px;
+  width: 125px;
 }
 select.seasons {
-  width: 120px;
+  width: 125px;
 }
 select.past-x {
   width: 135px;
 }
-
-#trade-select_team {
-  margin: 9px 0 0 0;
-}
+select.teams {
+  width: 203px;
+}*/
 
 #trade-summary {
   background-color: #fff;
 }
 
-.player_picture {
+#trade-summary form {
+  margin-bottom: 5px;
+}
+
+.select-team {
+  width: 203px
+}
+
+.player-picture {
   height: 150px;
   float: left;
+  margin-right: 10px;
   width: 100px;
+}
+
+#player-awards {
+  white-space: normal;
+}
+
+.team-picture {
+  display: none; /* Hide by default, shown in views/roster.js */
+	background-position: center center;
+	background-repeat: no-repeat;
+	background-size: contain;
+  margin-right: 10px;
+	margin-top: 12px;
+	width: 120px;
+	height: 120px;
+	float: left;
 }
 
 .skill {
@@ -220,9 +392,18 @@ select.past-x {
   margin-left: 5px;
   vertical-align: 2%;
 }
-.skills_alone {
+.skills-alone {
   margin-left: -5px;
   vertical-align: 2%;
+}
+
+.watch {
+  color: #aaa;
+  cursor: pointer;
+  margin-left: 5px;
+}
+.watch-active {
+  color: #d9534f;
 }
 
 #roster select {
@@ -250,35 +431,18 @@ select.past-x {
   color: #fff;
 }
 
-/* This is needed to keep the form fields the right size inside row-fluid after upgrading to Bootstrap 2.1. */
-.row-fluid input[class*="span"] {
-    min-height: 28px;
+.achievements {
+  margin: -4px;
 }
-
-.slide-out {
-  visibility: hidden;
-  padding: 20px;
-  width: 200px;
-  background: #f5f5f5;
-  border: 1px solid #e3e3e3;
-  -webkit-border-top-left-radius: 4px;
-     -moz-border-top-left-radius: 4px;
-          border-top-left-radius: 4px;
-  -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
-     -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
-          box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+.achievements .list-group-item {
+  border-radius: 0;
+  border: 0;
+  padding: 0;
 }
-.slide-out-handle {
-  /* http://charliepark.org/bootstrap_buttons/ */
- background-color: hsl(256, 100%, 38%) !important; background-repeat: repeat-x; filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#6932ff", endColorstr="#3300c1"); background-image: -khtml-gradient(linear, left top, left bottom, from(#6932ff), to(#3300c1)); background-image: -moz-linear-gradient(top, #6932ff, #3300c1); background-image: -ms-linear-gradient(top, #6932ff, #3300c1); background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #6932ff), color-stop(100%, #3300c1)); background-image: -webkit-linear-gradient(top, #6932ff, #3300c1); background-image: -o-linear-gradient(top, #6932ff, #3300c1); background-image: linear-gradient(#6932ff, #3300c1); border-color: #3300c1 #3300c1 hsl(256, 100%, 32.5%); color: #fff !important; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.36); -webkit-font-smoothing: antialiased; 
-
-
-  -webkit-border-bottom-left-radius: 0;
-     -moz-border-bottom-left-radius: 0;
-          border-bottom-left-radius: 0;
-  -webkit-border-bottom-right-radius: 0;
-     -moz-border-bottom-right-radius: 0;
-          border-bottom-right-radius: 0;
+.achievements .list-group-item div {
+  border-radius: 4px;
+  margin: 4px;
+  padding: 10px 15px;
 }
 
 .bar-graph-small {
@@ -311,25 +475,31 @@ select.past-x {
   font-weight: normal;
 }
 
+/* Stupid fix for popover on first run */
+.popover-play {
+  width: 276px;
+}
+.popover-play .popover-title {
+  background-color: #d0e9c6;
+}
+
 .finances-settings-label {
-  line-height: 26px;
+  line-height: 32px;
   padding-right: 1em;
   text-align: right;
   width: 100px;
 }
 .finances-settings-text {
-  line-height: 26px;
+  line-height: 32px;
   padding-left: 1em;
 }
 .finances-settings-text-small {
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 15px;
   padding-left: 1em;
 }
 .finances-settings-field {
-}
-.ticket-price {
-  width: 36px;
+  width: 115px;
 }
 .finances-settings button {
   display: none;
@@ -337,10 +507,17 @@ select.past-x {
 
 .label-injury {
   cursor: default;
-  font-size: 8px;
-  line-height: 8px;
   margin-left: 5px;
   vertical-align: 20%;
+}
+
+.trading-block-offer {
+  margin-bottom: 2em;
+}
+
+.trading-block-offer h2 {
+  float: left;
+  margin-right: 0.5em;
 }
 
 #messages {
@@ -371,203 +548,110 @@ select.past-x {
   text-decoration: none;
 }
 
+@media (max-width: 768px) {
+  .new_window {
+    display: none;
+  }
+}
+
 .alert p:last-child {
   margin-bottom: 0;
 }
 
-/* From bootstrap-responsive.css, force big size */
-  .row {
-    margin-left: -30px;
-    *zoom: 1;
+.alert-top {
+  margin-top: 20px;
+  padding-bottom: 2px;
+  padding-top: 12px;
+}
+.alert-top button {
+  margin-top: -4px;
+}
+.alert-changes h4 {
+  margin-top: 0;
+}
+.alert-changes ul {
+  margin-bottom: 9px;
+  padding-left: 18px;
+}
+
+.strong {
+  font-weight: bold;
+}
+
+/* HACK so that the td.info class can be overriden in teamHistory (and possibly elsewhere). */
+tr.warning > td {
+  background-color: #fcf8e3;
+  border-color: #fbeed5;
+}
+
+/* Affix stuff taken from Bootstrap docs and used for the play-by-play in live gameSim */
+/* By default it's not affixed in mobile views, so undo that */
+.affix {
+  position: static;
+}
+/* Show and affix the side nav when space allows it */
+@media (min-width: 992px) {
+  /* Widen the fixed sidebar */
+  .affix,
+  .affix-bottom {
+    width: 213px;
   }
-  .row:before,
-  .row:after {
-    display: table;
-    content: "";
+  .affix {
+    position: fixed; /* Undo the static from mobile first approach */
+    top: 60px;
   }
-  .row:after {
-    clear: both;
+  .affix-bottom {
+    position: absolute; /* Undo the static from mobile first approach */
   }
-  [class*="span"] {
-    float: left;
-    margin-left: 30px;
-  }
-  .container,
-  .navbar-fixed-top .container,
-  .navbar-fixed-bottom .container {
-    width: 1170px;
-  }
-  .span12 {
-    width: 1170px;
-  }
-  .span11 {
-    width: 1070px;
-  }
-  .span10 {
-    width: 970px;
-  }
-  .span9 {
-    width: 870px;
-  }
-  .span8 {
-    width: 770px;
-  }
-  .span7 {
-    width: 670px;
-  }
-  .span6 {
-    width: 570px;
-  }
-  .span5 {
-    width: 470px;
-  }
-  .span4 {
-    width: 370px;
-  }
-  .span3 {
-    width: 270px;
-  }
-  .span2 {
-    width: 170px;
-  }
-  .span1 {
-    width: 70px;
-  }
-  .offset12 {
-    margin-left: 1230px;
-  }
-  .offset11 {
-    margin-left: 1130px;
-  }
-  .offset10 {
-    margin-left: 1030px;
-  }
-  .offset9 {
-    margin-left: 930px;
-  }
-  .offset8 {
-    margin-left: 830px;
-  }
-  .offset7 {
-    margin-left: 730px;
-  }
-  .offset6 {
-    margin-left: 630px;
-  }
-  .offset5 {
-    margin-left: 530px;
-  }
-  .offset4 {
-    margin-left: 430px;
-  }
-  .offset3 {
-    margin-left: 330px;
-  }
-  .offset2 {
-    margin-left: 230px;
-  }
-  .offset1 {
-    margin-left: 130px;
-  }
-  .row-fluid {
-    width: 100%;
-    *zoom: 1;
-  }
-  .row-fluid:before,
-  .row-fluid:after {
-    display: table;
-    content: "";
-  }
-  .row-fluid:after {
-    clear: both;
-  }
-  .row-fluid > [class*="span"] {
-    float: left;
-    margin-left: 2.564102564%;
-  }
-  .row-fluid > [class*="span"]:first-child {
-    margin-left: 0;
-  }
-  .row-fluid > .span12 {
-    width: 100%;
-  }
-  .row-fluid > .span11 {
-    width: 91.45299145300001%;
-  }
-  .row-fluid > .span10 {
-    width: 82.905982906%;
-  }
-  .row-fluid > .span9 {
-    width: 74.358974359%;
-  }
-  .row-fluid > .span8 {
-    width: 65.81196581200001%;
-  }
-  .row-fluid > .span7 {
-    width: 57.264957265%;
-  }
-  .row-fluid > .span6 {
-    width: 48.717948718%;
-  }
-  .row-fluid > .span5 {
-    width: 40.170940171000005%;
-  }
-  .row-fluid > .span4 {
-    width: 31.623931624%;
-  }
-  .row-fluid > .span3 {
-    width: 23.076923077%;
-  }
-  .row-fluid > .span2 {
-    width: 14.529914530000001%;
-  }
-  .row-fluid > .span1 {
-    width: 5.982905983%;
-  }
-  input,
-  textarea,
-  .uneditable-input {
-    margin-left: 0;
-  }
-  input.span12, textarea.span12, .uneditable-input.span12 {
-    width: 1160px;
-  }
-  input.span11, textarea.span11, .uneditable-input.span11 {
-    width: 1060px;
-  }
-  input.span10, textarea.span10, .uneditable-input.span10 {
-    width: 960px;
-  }
-  input.span9, textarea.span9, .uneditable-input.span9 {
-    width: 860px;
-  }
-  input.span8, textarea.span8, .uneditable-input.span8 {
-    width: 760px;
-  }
-  input.span7, textarea.span7, .uneditable-input.span7 {
-    width: 660px;
-  }
-  input.span6, textarea.span6, .uneditable-input.span6 {
-    width: 560px;
-  }
-  input.span5, textarea.span5, .uneditable-input.span5 {
-    width: 460px;
-  }
-  input.span4, textarea.span4, .uneditable-input.span4 {
+}
+@media (min-width: 1200px) {
+  /* Widen the fixed sidebar again */
+  .affix-bottom,
+  .affix {
     width: 360px;
   }
-  input.span3, textarea.span3, .uneditable-input.span3 {
-    width: 260px;
-  }
-  input.span2, textarea.span2, .uneditable-input.span2 {
-    width: 160px;
-  }
-  input.span1, textarea.span1, .uneditable-input.span1 {
-    width: 60px;
-  }
-  .thumbnails {
-    margin-left: -30px;
-  }
-  .thumbnails > li {
-    margin-left: 30px;
-  }
+}
+
+/* Large screen sidebar, adapted from Bootstrap docs */
+.bs-sidenav {
+  margin-top: 24px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background-color: #f8f8f8;
+  border-radius: 5px;
+  border: 1px solid #e7e7e7;
+}
+.bs-navheader {
+  color: #777;
+  font-size: 11px;
+  font-weight: bold;
+  margin-top: 14px;
+  padding: 5px 20px;
+  text-transform: uppercase;
+}
+.bs-sidebar .nav > li > a {
+  display: block;
+  color: #333;
+  padding: 5px 20px;
+}
+.bs-sidebar .nav > li > a:hover,
+.bs-sidebar .nav > li > a:focus {
+  text-decoration: none;
+  background-color: #e0e0e0;
+  color: #333;
+}
+.bs-sidebar .nav > .active > a,
+.bs-sidebar .nav > .active:hover > a,
+.bs-sidebar .nav > .active:focus > a {
+  background-color: transparent;
+  border-right: 4px solid #428bca;
+  color: #333;
+  font-weight: bold;
+}
+
+#multi-team-menu {
+  background-color: #fff;
+  position: fixed;
+  right: 6px;
+  bottom: 6px;
+}

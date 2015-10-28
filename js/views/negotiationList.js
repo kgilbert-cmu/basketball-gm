@@ -1,13 +1,13 @@
 /**
  * @name views.negotiationList
- * @namespace List of resigning negotiations in progress.
+ * @namespace List of re-signing negotiations in progress.
  */
-define(["globals", "ui", "core/freeAgents", "core/player", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (g, ui, freeAgents, player, $, ko, _, bbgmView, helpers, viewHelpers) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, freeAgents, player, Promise, $, ko, _, bbgmView, helpers) {
     "use strict";
 
     var mapping;
 
-    function get(req) {
+    function get() {
         if (g.phase !== g.PHASE.RESIGN_PLAYERS) {
             return {
                 redirectUrl: helpers.leagueUrl(["negotiation", -1])
@@ -24,62 +24,60 @@ define(["globals", "ui", "core/freeAgents", "core/player", "lib/jquery", "lib/kn
     };
 
     function updateNegotiationList() {
-        var deferred;
+        // Get all free agents, filter array based on negotiations data, pass to player.filter, augment with contract data from negotiations
+        return Promise.all([
+            dao.negotiations.getAll(),
+            dao.players.getAll({
+                index: "tid",
+                key: g.PLAYER.FREE_AGENT,
+                statsSeasons: [g.season],
+                statsTid: g.userTid
+            })
+        ]).spread(function (negotiations, players) {
+            var i, j, negotiationPids;
 
-        deferred = $.Deferred();
+            // For Multi Team Mode, might have other team's negotiations going on
+            negotiations = negotiations.filter(function (negotiation) {
+                return negotiation.tid === g.userTid;
+            });
 
-        g.dbl.transaction("negotiations").objectStore("negotiations").getAll().onsuccess = function (event) {
-            var negotiations;
+            negotiationPids = _.pluck(negotiations, "pid");
 
-            negotiations = event.target.result;
+            players = players.filter(function (p) {
+                return negotiationPids.indexOf(p.pid) >= 0;
+            });
 
-            // Get all free agents, filter array based on negotiations data, pass to player.filter, augment with contract data from negotiations
-            g.dbl.transaction("players").objectStore("players").index("tid").getAll(g.PLAYER.FREE_AGENT).onsuccess = function (event) {
-                var i, j, players, playersAll, playersSome;
+            players = player.filter(players, {
+                attrs: ["pid", "name", "age", "freeAgentMood", "injury", "watch"],
+                ratings: ["ovr", "pot", "skills", "pos"],
+                stats: ["min", "pts", "trb", "ast", "per"],
+                season: g.season,
+                tid: g.userTid,
+                showNoStats: true,
+                fuzz: true
+            });
 
-                playersAll = event.target.result;
-                playersSome = [];
-                for (i = 0; i < playersAll.length; i++) {
-                    for (j = 0; j < negotiations.length; j++) {
-                        if (playersAll[i].pid === negotiations[j].pid) {
-                            playersSome.push(playersAll[i]);
-                            break;
-                        }
+            for (i = 0; i < players.length; i++) {
+                for (j = 0; j < negotiations.length; j++) {
+                    if (players[i].pid === negotiations[j].pid) {
+                        players[i].contract = {};
+                        players[i].contract.amount = negotiations[j].player.amount / 1000;
+                        players[i].contract.exp = g.season + negotiations[j].player.years;
+                        break;
                     }
                 }
 
-                players = player.filter(playersSome, {
-                    attrs: ["pid", "name", "pos", "age", "freeAgentMood", "injury"],
-                    ratings: ["ovr", "pot", "skills"],
-                    stats: ["min", "pts", "trb", "ast", "per"],
-                    season: g.season,
-                    tid: g.userTid,
-                    showNoStats: true,
-                    fuzz: true
-                });
+                players[i].mood = player.moodColorText(players[i]);
+            }
 
-                for (i = 0; i < players.length; i++) {
-                    for (j = 0; j < negotiations.length; j++) {
-                        if (players[i].pid === negotiations[j].pid) {
-                            players[i].contract = {};
-                            players[i].contract.amount = negotiations[j].player.amount / 1000;
-                            players[i].contract.exp = g.season + negotiations[j].player.years;
-                            break;
-                        }
-                    }
-                }
-
-                deferred.resolve({
-                    players: players
-                });
+            return {
+                players: players
             };
-        };
-
-        return deferred.promise();
+        });
     }
 
     function uiFirst(vm) {
-        ui.title("Resign Players");
+        ui.title("Re-sign Players");
 
         ko.computed(function () {
             ui.datatable($("#negotiation-list"), 4, _.map(vm.players(), function (p) {
@@ -88,11 +86,13 @@ define(["globals", "ui", "core/freeAgents", "core/player", "lib/jquery", "lib/kn
                     negotiateButton = "Refuses!";
                 } else {
                     // This can be a plain link because the negotiation has already been started at this point.
-                    negotiateButton = '<a href="' + helpers.leagueUrl(["negotiation", p.pid]) + '" class="btn btn-mini btn-primary">Negotiate</a>';
+                    negotiateButton = '<a href="' + helpers.leagueUrl(["negotiation", p.pid]) + '" class="btn btn-default btn-xs">Negotiate</a>';
                 }
-                return [helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills), p.pos, String(p.age), String(p.ratings.ovr), String(p.ratings.pot), helpers.round(p.stats.min, 1), helpers.round(p.stats.pts, 1), helpers.round(p.stats.trb, 1), helpers.round(p.stats.ast, 1), helpers.round(p.stats.per, 1), helpers.formatCurrency(p.contract.amount, "M") + ' thru ' + p.contract.exp, negotiateButton];
+                return [helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch), p.ratings.pos, String(p.age), String(p.ratings.ovr), String(p.ratings.pot), helpers.round(p.stats.min, 1), helpers.round(p.stats.pts, 1), helpers.round(p.stats.trb, 1), helpers.round(p.stats.ast, 1), helpers.round(p.stats.per, 1), helpers.formatCurrency(p.contract.amount, "M") + ' thru ' + p.contract.exp, '<div title="' + p.mood.text + '" style="width: 100%; height: 21px; background-color: ' + p.mood.color + '"><span style="display: none">' + p.freeAgentMood[g.userTid] + '</span></div>', negotiateButton];
             }));
         }).extend({throttle: 1});
+
+        ui.tableClickableRows($("#negotiation-list"));
     }
 
     return bbgmView.init({

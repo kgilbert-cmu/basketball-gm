@@ -3,7 +3,7 @@
 (function () {
     "use strict";
 
-    var Event, getAll, IDBIndex, IDBObjectStore, IDBRequest;
+    var Event, IDBIndex, IDBObjectStore, IDBRequest, getAll;
 
     IDBObjectStore = window.IDBObjectStore || window.webkitIDBObjectStore || window.mozIDBObjectStore || window.msIDBObjectStore;
     IDBIndex = window.IDBIndex || window.webkitIDBIndex || window.mozIDBIndex || window.msIDBIndex;
@@ -45,7 +45,7 @@
 
         // this is either an IDBObjectStore or an IDBIndex, depending on the context.
         this.openCursor(key).onsuccess = function (event) {
-            var cursor, e, target;
+            var cursor, e;
 
             cursor = event.target.result;
             if (cursor) {

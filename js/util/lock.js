@@ -2,21 +2,21 @@
  * @name util.lock
  * @namespace These functions all deal with locking game state when there is some blocking action in progress. Like don't allow game simulations when a trade is being negotiated. For figuring out the current state, trust only the database.
  */
-define(["db", "globals"], function (db, g) {
+define(["dao", "globals"], function (dao, g) {
     "use strict";
 
     /**
      * Is game simulation in progress?
      *
      * Calls the callback function with either true or false depending on whether there is a game simulation currently in progress.
-     * 
+     *
      * @memberOf util.lock
      * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on gameAttributes; if null is passed, then a new transaction will be used.
-     * @param {function(boolean)} cb Callback.
+     * @return {Promise.boolean}
      */
-    function gamesInProgress(ot, cb) {
-        db.loadGameAttribute(ot, "gamesInProgress", function () {
-            cb(g.gamesInProgress);
+    function gamesInProgress(ot) {
+        return require("core/league").loadGameAttribute(ot, "gamesInProgress").then(function () {
+            return g.gamesInProgress;
         });
     }
 
@@ -24,25 +24,31 @@ define(["db", "globals"], function (db, g) {
      * Is a negotiation in progress?
      *
      * Calls the callback function with either true or false depending on whether there is an ongoing negoation.
-     * 
+     *
      * @memberOf util.lock
      * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on negotiations; if null is passed, then a new transaction will be used.
-     * @param {function(boolean)} cb Callback.
+     * @return {Promise.boolean}
      */
-    function negotiationInProgress(ot, cb) {
-        var negotiationStore;
-
-        negotiationStore = db.getObjectStore(ot, "negotiations", "negotiations");
-        negotiationStore.getAll().onsuccess = function (event) {
-            var negotiations;
-
-            negotiations = event.target.result;
-
+    function negotiationInProgress(ot) {
+        return dao.negotiations.getAll({ot: ot}).then(function (negotiations) {
             if (negotiations.length > 0) {
-                return cb(true);
+                return true;
             }
-            return cb(false);
-        };
+            return false;
+        });
+    }
+
+    /**
+     * Is a phase change in progress?
+     *
+     * @memberOf util.lock
+     * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on gameAttributes and negotiations; if null is passed, then a new transaction will be used.
+     * @return {Promise.boolean}
+     */
+    function phaseChangeInProgress(ot) {
+        return require("core/league").loadGameAttribute(ot, "phaseChangeInProgress").then(function () {
+            return g.phaseChangeInProgress;
+        });
     }
 
     /**
@@ -52,20 +58,26 @@ define(["db", "globals"], function (db, g) {
      *
      * @memberOf util.lock
      * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on gameAttributes and negotiations; if null is passed, then a new transaction will be used.
-     * @param {function(boolean)} cb Callback.
+     * @return {Promise.boolean}
      */
-    function canStartGames(ot, cb) {
-        gamesInProgress(ot, function (gamesInProgressBool) {
+    function canStartGames(ot) {
+        return gamesInProgress(ot).then(function (gamesInProgressBool) {
             if (gamesInProgressBool) {
-                return cb(false);
+                return false;
             }
 
-            negotiationInProgress(ot, function (negotiationInProgressBool) {
+            return negotiationInProgress(ot).then(function (negotiationInProgressBool) {
                 if (negotiationInProgressBool) {
-                    return cb(false);
+                    return false;
                 }
 
-                return cb(true);
+                return phaseChangeInProgress(ot).then(function (phaseChangeInProgressBool) {
+                    if (phaseChangeInProgressBool) {
+                        return false;
+                    }
+
+                    return true;
+                });
             });
         });
     }
@@ -73,32 +85,32 @@ define(["db", "globals"], function (db, g) {
     /**
      * Can a new contract negotiation be started?
      *
-     * Calls the callback function with either true or false. If games are in progress or a free agent (not resigning!) is being negotiated with, false.
-     * 
+     * Calls the callback function with either true or false. If games are in progress or a free agent (not re-signing!) is being negotiated with, false.
+     *
      * @memberOf util.lock
      * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on gameAttributes and negotiations; if null is passed, then a new transaction will be used.
-     * @param {function(boolean)} cb Callback.
+     * @return {Promise.boolean}
      */
-    function canStartNegotiation(ot, cb) {
-        gamesInProgress(ot, function (gamesInProgressBool) {
+    function canStartNegotiation(ot) {
+        return gamesInProgress(ot).then(function (gamesInProgressBool) {
             if (gamesInProgressBool) {
-                return cb(false);
+                return false;
             }
 
-            // Allow multiple parallel negotiations only for resigning players
-            db.getObjectStore(ot, "negotiations", "negotiations").getAll().onsuccess = function (event) {
-                var i, negotiations;
-
-                negotiations = event.target.result;
+            // Allow multiple parallel negotiations only for re-signing players
+            return dao.negotiations.getAll({ot: ot}).then(function (negotiations) {
+                var i;
 
                 for (i = 0; i < negotiations.length; i++) {
                     if (!negotiations[i].resigning) {
-                        return cb(false);
+                        return false;
                     }
                 }
 
-                return cb(true);
-            };
+                return true;
+
+                // Don't also check phase change because negotiations are auto-started in phase change
+            });
         });
     }
 
@@ -106,30 +118,29 @@ define(["db", "globals"], function (db, g) {
      * Is there an undread message from the owner?
      *
      * Calls the callback function with either true or false.
-     * 
+     *
      * @memberOf util.lock
      * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on messages; if null is passed, then a new transaction will be used.
-     * @param {function(boolean)} cb Callback.
+     * @return {Promise.boolean}
      */
-    function unreadMessage(ot, cb) {
-        db.getObjectStore(ot, "messages", "messages").getAll().onsuccess = function (event) {
-            var i, messages;
-
-            messages = event.target.result;
+    function unreadMessage(ot) {
+        return dao.messages.getAll({ot: ot}).then(function (messages) {
+            var i;
 
             for (i = 0; i < messages.length; i++) {
                 if (!messages[i].read) {
-                    return cb(true);
+                    return true;
                 }
             }
 
-            return cb(false);
-        };
+            return false;
+        });
     }
 
     return {
         gamesInProgress: gamesInProgress,
         negotiationInProgress: negotiationInProgress,
+        phaseChangeInProgress: phaseChangeInProgress,
         canStartGames: canStartGames,
         canStartNegotiation: canStartNegotiation,
         unreadMessage: unreadMessage

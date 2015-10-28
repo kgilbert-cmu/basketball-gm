@@ -1,36 +1,39 @@
-<div id="contentwrapper">
-  <div id="league_content" data-id-loading="" data-id-loaded="">
+<div class="row">
+  <div class="col-lg-2 hidden-md hidden-sm hidden-xs" id="left-menu">
+    <div class="bs-sidebar">
+      <ul class="bs-sidenav nav">
+        <li data-bind="css: {active: template() === 'leagueDashboard'}"><a data-bind="attrLeagueUrl: {href: []}">Dashboard</a></li>
+        <li class="bs-navheader">League</li>
+        <li data-bind="css: {active: template() === 'standings'}"><a data-bind="attrLeagueUrl: {href: ['standings']}">Standings</a></li>
+        <li data-bind="css: {active: template() === 'playoffs'}"><a data-bind="attrLeagueUrl: {href: ['playoffs']}">Playoffs</a></li>
+        <li data-bind="css: {active: template() === 'leagueFinances'}"><a data-bind="attrLeagueUrl: {href: ['league_finances']}">Finances</a></li>
+        <li data-bind="css: {active: template() === 'history' || template() === 'historyAll'}"><a data-bind="attrLeagueUrl: {href: ['history_all']}">History</a></li>
+        <li data-bind="css: {active: template() === 'powerRankings'}"><a data-bind="attrLeagueUrl: {href: ['power_rankings']}">Power Rankings</a></li>
+        <li data-bind="css: {active: template() === 'transactions' }"><a data-bind="attrLeagueUrl: {href: ['transactions', 'all']}">Transactions</a></li>
+        <li class="bs-navheader">Team</li>
+        <li data-bind="css: {active: template() === 'roster'}"><a data-bind="attrLeagueUrl: {href: ['roster']}">Roster</a></li>
+        <li data-bind="css: {active: template() === 'schedule'}"><a data-bind="attrLeagueUrl: {href: ['schedule']}">Schedule</a></li>
+        <li data-bind="css: {active: template() === 'teamFinances'}"><a data-bind="attrLeagueUrl: {href: ['team_finances']}">Finances</a></li>
+        <li data-bind="css: {active: template() === 'teamHistory'}"><a data-bind="attrLeagueUrl: {href: ['team_history']}">History</a></li>
+        <li class="bs-navheader">Players</li>
+        <li data-bind="css: {active: template() === 'freeAgents'}"><a data-bind="attrLeagueUrl: {href: ['free_agents']}">Free Agents</a></li>
+        <li data-bind="css: {active: template() === 'trade'}"><a data-bind="attrLeagueUrl: {href: ['trade']}">Trade</a></li>
+        <li data-bind="css: {active: template() === 'tradingBlock'}"><a data-bind="attrLeagueUrl: {href: ['trading_block']}">Trading Block</a></li>
+        <li data-bind="css: {active: template() && template().indexOf('draft') >= 0}"><a data-bind="attrLeagueUrl: {href: ['draft']}">Draft</a></li>
+        <li data-bind="css: {active: template() === 'watchList'}"><a data-bind="attrLeagueUrl: {href: ['watch_list']}">Watch List</a></li>
+        <li data-bind="css: {active: template() === 'hallOfFame'}"><a data-bind="attrLeagueUrl: {href: ['hall_of_fame']}">Hall of Fame</a></li>
+        <li class="bs-navheader">Stats</li>
+        <li data-bind="css: {active: template() === 'gameLog'}"><a data-bind="attrLeagueUrl: {href: ['game_log']}">Game Log</a></li>
+        <li data-bind="css: {active: template() === 'leaders'}"><a data-bind="attrLeagueUrl: {href: ['leaders']}">League Leaders</a></li>
+        <li data-bind="css: {active: template() === 'playerRatings'}"><a data-bind="attrLeagueUrl: {href: ['player_ratings']}">Player Ratings</a></li>
+        <li data-bind="css: {active: template() === 'playerStats'}"><a data-bind="attrLeagueUrl: {href: ['player_stats']}">Player Stats</a></li>
+        <li data-bind="css: {active: template() === 'teamStats'}"><a data-bind="attrLeagueUrl: {href: ['team_stats']}">Team Stats</a></li>
+        <li data-bind="css: {active: template() === 'playerFeats'}"><a data-bind="attrLeagueUrl: {href: ['player_feats']}">Statistical Feats</a></li>
+      </ul>
+    </div>
   </div>
-</div>
-
-<div id="league-menu">
-  <div class="well sidebar-nav">
-    <ul class="nav nav-list">
-      <li id="nav_league_dashboard"><a data-bind="attrLeagueUrl: {href: []}">Dashboard</a></li>
-      <li id="nav_inbox"><a data-bind="attrLeagueUrl: {href: ['inbox']}">Inbox</a></li>
-      <li class="nav-header">League</li>
-      <li id="nav_standings"><a data-bind="attrLeagueUrl: {href: ['standings']}">Standings</a></li>
-      <li id="nav_playoffs"><a data-bind="attrLeagueUrl: {href: ['playoffs']}">Playoffs</a></li>
-      <li id="nav_league_finances"><a data-bind="attrLeagueUrl: {href: ['league_finances']}">Finances</a></li>
-      <li id="nav_history"><a data-bind="attrLeagueUrl: {href: ['history']}">History</a></li>
-      <li class="nav-header">Team</li>
-      <li id="nav_roster"><a data-bind="attrLeagueUrl: {href: ['roster']}">Roster</a></li>
-      <li id="nav_schedule"><a data-bind="attrLeagueUrl: {href: ['schedule']}">Schedule</a></li>
-      <li id="nav_team_finances"><a data-bind="attrLeagueUrl: {href: ['team_finances']}">Finances</a></li>
-      <li id="nav_team_history"><a data-bind="attrLeagueUrl: {href: ['team_history']}">History</a></li>
-      <li class="nav-header">Players</li>
-      <li id="nav_free_agents"><a data-bind="attrLeagueUrl: {href: ['free_agents']}">Free Agents</a></li>
-      <li id="nav_trade"><a data-bind="attrLeagueUrl: {href: ['trade']}">Trade</a></li>
-      <li id="nav_draft"><a data-bind="attrLeagueUrl: {href: ['draft']}">Draft</a></li>
-      <li id="nav_hall_of_fame"><a data-bind="attrLeagueUrl: {href: ['hall_of_fame']}">Hall of Fame</a></li>
-      <li class="nav-header">Stats</li>
-      <li id="nav_game_log"><a data-bind="attrLeagueUrl: {href: ['game_log']}">Game Log</a></li>
-      <li id="nav_leaders"><a data-bind="attrLeagueUrl: {href: ['leaders']}">League Leaders</a></li>
-      <li id="nav_player_ratings"><a data-bind="attrLeagueUrl: {href: ['player_ratings']}">Player Ratings</a></li>
-      <li id="nav_player_stats"><a data-bind="attrLeagueUrl: {href: ['player_stats']}">Player Stats</a></li>
-      <li id="nav_team_stats"><a data-bind="attrLeagueUrl: {href: ['team_stats']}">Team Stats</a></li>
-      <li class="nav-header">Util</li>
-      <li id="nav_export_rosters"><a data-bind="attrLeagueUrl: {href: ['export_rosters']}">Export Rosters</a></li>
-    </ul>
+  <div class="col-lg-10 col-xs-12 p402_premium">
+    <div id="league_content" data-id-loading="" data-id-loaded="">
+    </div>
   </div>
 </div>

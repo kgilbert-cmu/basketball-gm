@@ -2,81 +2,81 @@
  * @name views.leagueDashboard
  * @namespace League dashboard, displaying several bits of information about the league/team.
  */
-define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/jquery", "lib/knockout", "lib/knockout.mapping", "lib/underscore", "util/bbgmView", "util/helpers", "util/viewHelpers"], function (db, g, ui, player, season, team, $, ko, mapping, _, bbgmView, helpers, viewHelpers) {
+define(["dao", "globals", "ui", "core/player", "core/season", "core/team", "lib/knockout", "lib/knockout.mapping", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, player, season, team, ko, komapping, _, bbgmView, helpers) {
     "use strict";
 
-    function updateTeam(inputs, updateEvents) {
-        var deferred, vars;
+    function InitViewModel() {
+        this.completed = ko.observableArray([]);
+        this.upcoming = ko.observableArray([]);
+    }
 
-        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PRESEASON)) {
-            deferred = $.Deferred();
-            vars = {};
+    function updateInbox(inputs, updateEvents) {
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0) {
+            return dao.messages.getAll().then(function (messages) {
+                var i;
 
-            g.dbl.transaction("teams").objectStore("teams").get(g.userTid).onsuccess = function (event) {
-                var i, userTeam, userTeamSeason;
+                messages.reverse();
 
-                userTeam = event.target.result;
-                userTeamSeason = _.last(userTeam.seasons);
-
-                vars.region = userTeam.region;
-                vars.name = userTeam.name;
-                vars.abbrev = userTeam.abbrev;
-                vars.won = userTeamSeason.won;
-                vars.lost = userTeamSeason.lost;
-                vars.cash = userTeamSeason.cash / 1000;  // [millions of dollars]
-                vars.salaryCap = g.salaryCap / 1000;  // [millions of dollars]
-                vars.season = g.season;
-
-                vars.recentHistory = [];
-                // 3 most recent years
-                for (i = userTeam.seasons.length - 2; i > userTeam.seasons.length - 5 && i >= 0; i--) {
-                    vars.recentHistory.push({
-                        season: userTeam.seasons[i].season,
-                        won: userTeam.seasons[i].won,
-                        lost: userTeam.seasons[i].lost,
-                        playoffRoundsWon: userTeam.seasons[i].playoffRoundsWon
-                    });
+                for (i = 0; i < messages.length; i++) {
+                    delete messages[i].text;
                 }
+                messages = messages.slice(0, 2);
 
-                deferred.resolve(vars);
-            };
-            return deferred.promise();
+                return {
+                    messages: messages
+                };
+            });
+        }
+    }
+
+    function updateTeam(inputs, updateEvents) {
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || updateEvents.indexOf("newPhase") >= 0) {
+            return dao.teams.get({key: g.userTid}).then(function (t) {
+                var latestSeason;
+
+                latestSeason = t.seasons[t.seasons.length - 1];
+
+                return {
+                    region: t.region,
+                    name: t.name,
+                    abbrev: t.abbrev,
+                    won: latestSeason.won,
+                    lost: latestSeason.lost,
+                    cash: latestSeason.cash / 1000,  // [millions of dollars]
+                    salaryCap: g.salaryCap / 1000,  // [millions of dollars]
+                    season: g.season,
+                    playoffRoundsWon: latestSeason.playoffRoundsWon
+                };
+            });
         }
     }
 
     function updatePayroll(inputs, updateEvents) {
-        var deferred, vars;
-
-        deferred = $.Deferred();
-        vars = {};
-
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("playerMovement") >= 0) {
-            db.getPayroll(null, g.userTid, function (payroll) {
-                vars.payroll = payroll / 1000;  // [millions of dollars]
-
-                deferred.resolve(vars);
+            return team.getPayroll(null, g.userTid).get(0).then(function (payroll) {
+                return {
+                    payroll: payroll / 1000 // [millions of dollars]
+                };
             });
-            return deferred.promise();
         }
     }
 
 
     function updateTeams(inputs, updateEvents) {
-        var deferred, stats, vars;
+        var stats, vars;
 
-        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PRESEASON)) {
-            deferred = $.Deferred();
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || updateEvents.indexOf("newPhase") >= 0) {
             vars = {};
-
             stats = ["pts", "oppPts", "trb", "ast"];  // This is also used later to find ranks for these team stats
-            team.filter({
+
+            return team.filter({
                 attrs: ["tid", "cid"],
-                seasonAttrs: ["won", "lost", "winp", "streakLong", "att", "revenue", "profit"],
+                seasonAttrs: ["won", "lost", "winp", "att", "revenue", "profit"],
                 stats: stats,
                 season: g.season,
-                sortBy: "winp"
-            }, function (teams) {
-                var cid, i, j, ranks;
+                sortBy: ["winp", "-lost", "won"]
+            }).then(function (teams) {
+                var cid, i, j;
 
                 cid = _.find(teams, function (t) { return t.tid === g.userTid; }).cid;
 
@@ -89,7 +89,6 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
                             vars.trb = teams[i].trb;
                             vars.ast = teams[i].ast;
 
-                            vars.streakLong = teams[i].streakLong;
                             vars.att = teams[i].att;
                             vars.revenue = teams[i].revenue;
                             vars.profit = teams[i].profit;
@@ -111,112 +110,117 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
                 }
                 vars.oppPtsRank = 31 - vars.oppPtsRank;
 
-                deferred.resolve(vars);
+                return vars;
             });
-            return deferred.promise();
         }
     }
 
-    function updateGames(inputs, updateEvents) {
-        var deferred, vars;
+    function updateGames(inputs, updateEvents, vm) {
+        var completed, numShowCompleted;
 
-        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PRESEASON)) {
-            deferred = $.Deferred();
-            vars = {};
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("newPhase") >= 0) {
+            numShowCompleted = 4;
+            completed = [];
 
-            g.dbl.transaction("games").objectStore("games").index("season").getAll(g.season).onsuccess = function (event) {
-                var games, i, overtime;
+            // This could be made much faster by using a compound index to search for season + team, but that's not supported by IE 10
+            return dao.games.iterate({
+                index: "season",
+                key: g.season,
+                direction: "prev",
+                callback: function (game, shortCircuit) {
+                    var i, overtime;
 
-                games = event.target.result;
-                games.reverse();  // Look through most recent games first
+                    if (completed.length >= numShowCompleted) {
+                        return shortCircuit();
+                    }
 
-                vars.recentGames = [];
-                for (i = 0; i < games.length; i++) {
-                    if (games[i].overtimes === 1) {
+                    if (game.overtimes === 1) {
                         overtime = " (OT)";
-                    } else if (games[i].overtimes > 1) {
-                        overtime = " (" + games[i].overtimes + "OT)";
+                    } else if (game.overtimes > 1) {
+                        overtime = " (" + game.overtimes + "OT)";
                     } else {
                         overtime = "";
                     }
 
                     // Check tid
-                    if (games[i].teams[0].tid === g.userTid) {
-                        vars.recentGames.push({
-                            gid: games[i].gid,
-                            home: true,
-                            pts: games[i].teams[0].pts,
-                            oppPts: games[i].teams[1].pts,
-                            oppAbbrev: helpers.getAbbrev(games[i].teams[1].tid),
-                            won: games[i].teams[0].pts > games[i].teams[1].pts,
+                    if (game.teams[0].tid === g.userTid || game.teams[1].tid === g.userTid) {
+                        completed.push({
+                            gid: game.gid,
                             overtime: overtime
                         });
-                    } else if (games[i].teams[1].tid === g.userTid) {
-                        vars.recentGames.push({
-                            gid: games[i].gid,
-                            home: false,
-                            pts: games[i].teams[1].pts,
-                            oppPts: games[i].teams[0].pts,
-                            oppAbbrev: helpers.getAbbrev(games[i].teams[0].tid),
-                            won: games[i].teams[1].pts > games[i].teams[0].pts,
-                            overtime: overtime
-                        });
-                    }
 
-                    if (vars.recentGames.length === 3) {
-                        break;
+                        i = completed.length - 1;
+                        if (game.teams[0].tid === g.userTid) {
+                            completed[i].home = true;
+                            completed[i].pts = game.teams[0].pts;
+                            completed[i].oppPts = game.teams[1].pts;
+                            completed[i].oppTid = game.teams[1].tid;
+                            completed[i].oppAbbrev = g.teamAbbrevsCache[game.teams[1].tid];
+                            completed[i].won = game.teams[0].pts > game.teams[1].pts;
+                        } else if (game.teams[1].tid === g.userTid) {
+                            completed[i].home = false;
+                            completed[i].pts = game.teams[1].pts;
+                            completed[i].oppPts = game.teams[0].pts;
+                            completed[i].oppTid = game.teams[0].tid;
+                            completed[i].oppAbbrev = g.teamAbbrevsCache[game.teams[0].tid];
+                            completed[i].won = game.teams[1].pts > game.teams[0].pts;
+                        }
+
+                        completed[i] = helpers.formatCompletedGame(completed[i]);
                     }
                 }
-
-                deferred.resolve(vars);
-            };
-            return deferred.promise();
+            }).then(function () {
+                vm.completed(completed);
+            });
         }
     }
 
-    function updateSchedule(inputs, updateEvents) {
-        var deferred, vars;
+    function updateSchedule(inputs, updateEvents, vm) {
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("newPhase") >= 0) {
+            return season.getSchedule().then(function (schedule_) {
+                var game, games, i, numShowUpcoming, row, team0, team1;
 
-        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PRESEASON)) {
-            deferred = $.Deferred();
-            vars = {};
+                games = [];
+                numShowUpcoming = 3;
+                for (i = 0; i < schedule_.length; i++) {
+                    game = schedule_[i];
+                    if (g.userTid === game.homeTid || g.userTid === game.awayTid) {
+                        team0 = {tid: game.homeTid, abbrev: g.teamAbbrevsCache[game.homeTid], region: g.teamRegionsCache[game.homeTid], name: g.teamNamesCache[game.homeTid]};
+                        team1 = {tid: game.awayTid, abbrev: g.teamAbbrevsCache[game.awayTid], region: g.teamRegionsCache[game.awayTid], name: g.teamNamesCache[game.awayTid]};
+                        if (g.userTid === game.homeTid) {
+                            row = {teams: [team1, team0], vsat: "at"};
+                        } else {
+                            row = {teams: [team1, team0], vsat: "at"};
+                        }
+                        games.push(row);
+                    }
 
-            season.getSchedule(null, 0, function (schedule) {
-                var i;
-
-                vars.nextGameAbbrev = "";
-                vars.nextGameHome = false;
-                for (i = 0; i < schedule.length; i++) {
-                    if (schedule[i].homeTid === g.userTid) {
-                        vars.nextGameAbbrev = schedule[i].awayAbbrev;
-                        vars.nextGameHome = true;
-                        break;
-                    } else if (schedule[i].awayTid === g.userTid) {
-                        vars.nextGameAbbrev = schedule[i].homeAbbrev;
+                    if (games.length >= numShowUpcoming) {
                         break;
                     }
                 }
-                deferred.resolve(vars);
+                vm.upcoming(games);
             });
-            return deferred.promise();
         }
     }
 
     function updatePlayers(inputs, updateEvents) {
-        var deferred, vars;
+        var vars;
 
-        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PRESEASON)) {
-            deferred = $.Deferred();
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0 || updateEvents.indexOf("newPhase") >= 0) {
             vars = {};
 
-            g.dbl.transaction("players").objectStore("players").index("tid").getAll(IDBKeyRange.lowerBound(g.PLAYER.RETIRED, true)).onsuccess = function (event) {
-                var i, freeAgents, leagueLeaders, players, stats, userPlayers;
+            return dao.players.getAll({
+                index: "tid",
+                key: IDBKeyRange.lowerBound(g.PLAYER.UNDRAFTED),
+                statsSeasons: [g.season]
+            }).then(function (players) {
+                var i, stats, userPlayers;
 
-                stats = ["pts", "trb", "ast"];  // This is also used later to find team/league leaders for these player stats
-                players = player.filter(event.target.result, {
-                    attrs: ["pid", "name", "abbrev", "tid", "age", "contract", "rosterOrder"],
-                    ratings: ["ovr", "pot"],
-                    stats: stats,
+                players = player.filter(players, {
+                    attrs: ["pid", "name", "abbrev", "tid", "age", "contract", "rosterOrder", "injury", "watch"],
+                    ratings: ["ovr", "pot", "dovr", "dpot", "skills", "pos"],
+                    stats: ["gp", "min", "pts", "trb", "ast", "per", "yearsWithTeam"],
                     season: g.season,
                     showNoStats: true,
                     showRookies: true,
@@ -225,6 +229,7 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
 
                 // League leaders
                 vars.leagueLeaders = {};
+                stats = ["pts", "trb", "ast"]; // Categories for leaders
                 for (i = 0; i < stats.length; i++) {
                     players.sort(function (a, b) { return b.stats[stats[i]] - a.stats[stats[i]]; });
                     vars.leagueLeaders[stats[i]] = {
@@ -239,78 +244,44 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
                 userPlayers = _.filter(players, function (p) { return p.tid === g.userTid; });
                 vars.teamLeaders = {};
                 for (i = 0; i < stats.length; i++) {
-                    userPlayers.sort(function (a, b) { return b.stats[stats[i]] - a.stats[stats[i]]; });
-                    vars.teamLeaders[stats[i]] = {
-                        pid: userPlayers[0].pid,
-                        name: userPlayers[0].name,
-                        stat: userPlayers[0].stats[stats[i]]
-                    };
-                }
-
-                // Expiring contracts
-                userPlayers.sort(function (a, b) {  return a.rosterOrder - b.rosterOrder; });
-                vars.expiring = [];
-                for (i = 0; i < userPlayers.length; i++) {
-                    // Show contracts expiring this year, or next year if we're already in free agency
-                    if (userPlayers[i].contract.exp === g.season || (g.phase >= g.PHASE.RESIGN_PLAYERS && userPlayers[i].contract.exp === g.season + 1)) {
-                        vars.expiring.push({
-                            pid: userPlayers[i].pid,
-                            name: userPlayers[i].name,
-                            age: userPlayers[i].age,
-                            pts: userPlayers[i].stats.pts,
-                            contractAmount: userPlayers[i].contract.amount,
-                            ovr: userPlayers[i].ratings.ovr,
-                            pot: userPlayers[i].ratings.pot
-                        });
+                    if (userPlayers.length > 0) {
+                        userPlayers.sort(function (a, b) { return b.stats[stats[i]] - a.stats[stats[i]]; });
+                        vars.teamLeaders[stats[i]] = {
+                            pid: userPlayers[0].pid,
+                            name: userPlayers[0].name,
+                            stat: userPlayers[0].stats[stats[i]]
+                        };
+                    } else {
+                        vars.teamLeaders[stats[i]] = {
+                            pid: 0,
+                            name: "",
+                            stat: 0
+                        };
                     }
                 }
 
-                // Free agents
-                freeAgents = _.filter(players, function (p) { return p.tid === g.PLAYER.FREE_AGENT; });
-                freeAgents.sort(function (a, b) {  return (b.ratings.ovr + b.ratings.pot) - (a.ratings.ovr + a.ratings.pot); });
-                vars.freeAgents = [];
-                if (freeAgents.length > 0) {
-                    i = 0;
-                    while (true) {
-                        vars.freeAgents.push({
-                            pid: freeAgents[i].pid,
-                            name: freeAgents[i].name,
-                            age: freeAgents[i].age,
-                            ovr: freeAgents[i].ratings.ovr,
-                            pot: freeAgents[i].ratings.pot
-                        });
+                // Roster
+                // Find starting 5
+                vars.starters = userPlayers.sort(function (a, b) { return a.rosterOrder - b.rosterOrder; }).slice(0, 5);
 
-                        i += 1;
-                        if (i === 3 || i === freeAgents.length) {
-                            break;
-                        }
-                    }
-                }
-                vars.numRosterSpots = 15 - userPlayers.length;
-
-                deferred.resolve(vars);
-            };
-            return deferred.promise();
+                return vars;
+            });
         }
     }
 
-    function updatePlayoffs(inputs, updateEvents) {
-        var deferred, vars;
-
+    function updatePlayoffs(inputs, updateEvents, vm) {
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || (g.phase >= g.PHASE.PLAYOFFS && updateEvents.indexOf("gameSim") >= 0) || (updateEvents.indexOf("newPhase") >= 0 && g.phase === g.PHASE.PLAYOFFS)) {
-            deferred = $.Deferred();
-            vars = {
-                showPlayoffSeries: false,
-                playoffsStarted: g.phase >= g.PHASE.PLAYOFFS
-            };
+            return dao.playoffSeries.get({key: g.season}).then(function (playoffSeries) {
+                var found, i, rnd, series, vars;
 
-            g.dbl.transaction("playoffSeries").objectStore("playoffSeries").get(g.season).onsuccess = function (event) {
-                var data, found, i, playoffSeries, rnd, series;
+                vars = {
+                    showPlayoffSeries: false
+                };
 
-                playoffSeries = event.target.result;
                 if (playoffSeries !== undefined) {
                     series = playoffSeries.series;
                     found = false;
+
                     // Find the latest playoff series with the user's team in it
                     for (rnd = playoffSeries.currentRound; rnd >= 0; rnd--) {
                         for (i = 0; i < series[rnd].length; i++) {
@@ -327,6 +298,11 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
                                 } else if (rnd === 3) {
                                     vars.seriesTitle = "League Finals";
                                 }
+
+                                // Update here rather than by returning vars because returning vars doesn't guarantee order of updates, so it can cause an error when showPlayoffSeries is true before the other stuff is set (try it with the same league in two tabs). But otherwise (for normal page loads), this isn't sufficient and we need to return vars. I don't understand, but it works.
+                                if (updateEvents.indexOf("dbChange") >= 0) {
+                                    komapping.fromJS({series: vars.series, seriesTitle: vars.seriesTitle}, vm);
+                                }
                                 break;
                             }
                         }
@@ -336,9 +312,53 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
                     }
                 }
 
-                deferred.resolve(vars);
-            };
-            return deferred.promise();
+                return vars;
+            });
+        }
+    }
+
+    function updateStandings(inputs, updateEvents) {
+        if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("gameSim") >= 0) {
+            return team.filter({
+                attrs: ["tid", "cid", "abbrev", "region"],
+                seasonAttrs: ["won", "lost", "winp"],
+                season: g.season,
+                sortBy: ["winp", "-lost", "won"]
+            }).then(function (teams) {
+                var cid, confTeams, i, k, l;
+
+                // Find user's conference
+                for (i = 0; i < teams.length; i++) {
+                    if (teams[i].tid === g.userTid) {
+                        cid = teams[i].cid;
+                        break;
+                    }
+                }
+
+                confTeams = [];
+                l = 0;
+                for (k = 0; k < teams.length; k++) {
+                    if (cid === teams[k].cid) {
+                        confTeams.push(helpers.deepCopy(teams[k]));
+                        confTeams[l].rank = l + 1;
+                        if (l === 0) {
+                            confTeams[l].gb = 0;
+                        } else {
+                            confTeams[l].gb = helpers.gb(confTeams[0], confTeams[l]);
+                        }
+                        if (confTeams[l].tid === g.userTid) {
+                            confTeams[l].highlight = true;
+                        } else {
+                            confTeams[l].highlight = false;
+                        }
+                        l += 1;
+                    }
+                }
+
+                return {
+                    confTeams: confTeams
+                };
+            });
         }
     }
 
@@ -348,7 +368,8 @@ define(["db", "globals", "ui", "core/player", "core/season", "core/team", "lib/j
 
     return bbgmView.init({
         id: "leagueDashboard",
-        runBefore: [updateTeam, updatePayroll, updateTeams, updateGames, updateSchedule, updatePlayers, updatePlayoffs],
+        InitViewModel: InitViewModel,
+        runBefore: [updateInbox, updateTeam, updatePayroll, updateTeams, updateGames, updateSchedule, updatePlayers, updatePlayoffs, updateStandings],
         uiFirst: uiFirst
     });
 });
