@@ -633,7 +633,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
         eventLog.add(null, {
             type: "release",
-            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>.',
+            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.firstName + " " + p.lastName + '</a>.',
             showNotification: false,
             pids: [p.pid],
             tids: [p.tid]
@@ -775,7 +775,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }
         ln = playerNames.last[i][0];
 
-        return fn + " " + ln;
+        return [fn, ln];
     }
 
     /**
@@ -895,7 +895,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
     }
 
     function generate(tid, age, profile, baseRating, pot, draftYear, newLeague, scoutingRank) {
-        var maxHgt, maxWeight, minHgt, minWeight, nationality, p, rand;
+        var maxHgt, maxWeight, minHgt, minWeight, nationality, p, rand, randomName;
 
         p = {}; // Will be saved to database
         p.tid = tid;
@@ -936,7 +936,9 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             loc: nationality
         };
 
-        p.name = name(nationality);
+        randomName = name(nationality);
+        p.firstName = randomName[0];  // first
+        p.lastName = randomName[1];   // last
         p.college = "";
         p.imgURL = ""; // Custom rosters can define player image URLs to be used rather than vector faces
 
@@ -1140,6 +1142,8 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                             });
                         }
                     }
+                } else if {options.attrs[i] === "name") {
+                    fp.name = fp.firstName + " " + fp.lastName;
                 } else {
                     fp[options.attrs[i]] = p[options.attrs[i]];
                 }
@@ -1769,7 +1773,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         if (retiredNotification) {
             eventLog.add(tx, {
                 type: "retired",
-                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>  retired.',
+                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.firstName + " " + p.lastName + '</a>  retired.',
                 showNotification: p.tid === g.userTid,
                 pids: [p.pid],
                 tids: [p.tid]
@@ -1785,7 +1789,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             p.awards.push({season: g.season, type: "Inducted into the Hall of Fame"});
             eventLog.add(tx, {
                 type: "hallOfFame",
-                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> was inducted into the <a href="' + helpers.leagueUrl(["hall_of_fame"]) + '">Hall of Fame</a>.',
+                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.firstName + " " + p.lastName + '</a> was inducted into the <a href="' + helpers.leagueUrl(["hall_of_fame"]) + '">Hall of Fame</a>.',
                 showNotification: p.statsTids.indexOf(g.userTid) >= 0,
                 pids: [p.pid],
                 tids: p.statsTids
@@ -1997,7 +2001,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                 }
             }
 
-            featText = '<a href="' + helpers.leagueUrl(["player", pid]) + '">' + p.name + '</a> had <a href="' + helpers.leagueUrl(["game_log", g.teamAbbrevsCache[tid], g.season, results.gid]) + '">';
+            featText = '<a href="' + helpers.leagueUrl(["player", pid]) + '">' + p.firstName + " " p.lastName + '</a> had <a href="' + helpers.leagueUrl(["game_log", g.teamAbbrevsCache[tid], g.season, results.gid]) + '">';
             for (k = 0; k < featTextArr.length; k++) {
                 if (featTextArr.length > 1 && k === featTextArr.length - 1) {
                     featText += " and ";
@@ -2015,7 +2019,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
             feat = {
                 pid: pid,
-                name: p.name,
+                name: p.firstName + " " + p.lastName,
                 pos: p.pos,
                 season: g.season,
                 tid: tid,
@@ -2087,7 +2091,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }).then(function () {
             eventLog.add(tx, {
                 type: "tragedy",
-                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> ' + reason + '.',
+                text: '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.firstName + " " + p.lastName + '</a> ' + reason + '.',
                 showNotification: tid === g.userTid,
                 pids: [p.pid],
                 tids: [tid],
