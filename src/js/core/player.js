@@ -724,23 +724,23 @@ function name() {
 
     // First name
     const fnRand = random.uniform(0, playerNames.first[playerNames.first.length - 1][1]);
-    var firstName = playerNames.first.find(row => row[1] >= fnRand)[0];
+    let firstName = playerNames.first.find(row => row[1] >= fnRand)[0];
 
     /* rules for extended names more complex than `${Fn} ${Ln}`:
      * 5% of players will have a middle name
      * 50% will initialize it, 50% will use it fully
      * of the 50% who initialize, 50% will also initialize ${Fn}
      * of the 50% who don't, 10% will instead initialize ${Fn}
-     * 
+     *
      * 1% of players will have a second last name
      * 75% will hyphenate the two together
      * 25% will go by both
      */
-    
+
     const middle = random.uniform(0, 1);
     if (middle < 0.05) {
         const mnRand = random.uniform(0, playerNames.first[playerNames.first.length - 1][1]);
-        var middleName = playerNames.first.find(row => row[1] >= mnRand)[0];
+        let middleName = playerNames.first.find(row => row[1] >= mnRand)[0];
         const initialize = random.uniform(0, 1);
         if (initialize < 0.5) {
             // initialize it
@@ -761,17 +761,12 @@ function name() {
 
     // Last name
     const lnRand = random.uniform(0, playerNames.last[playerNames.last.length - 1][1]);
-    var lastName = playerNames.last.find(row => row[1] >= lnRand)[0];
+    let lastName = playerNames.last.find(row => row[1] >= lnRand)[0];
     const secondLn = random.uniform(0, 1);
     if (secondLn < 0.01) {
         const slnRand = random.uniform(0, playerNames.last[playerNames.last.length - 1][1]);
         const secondLastName = playerNames.last.find(row => row[1] >= slnRand)[0];
-        const hyphen = random.uniform(0, 1);
-        if (hyphen < 0.75) {
-            lastName = `${lastName}-${secondLastName}`;
-        } else {
-            lastName = `${lastName} ${secondLastName}`;
-        }
+        lastName = `${lastName}-${secondLastName}`;
     }
 
     return {firstName, lastName};
