@@ -8,6 +8,8 @@ An overhaul to write Quidditch-GM, a continuation of work from hpteam, but now w
 
 Very much in beginning stages.
 
+Some initial changes and test plays at reddit.com/r/quidditchgm
+
 
 ## Normal Readme Starts
 
