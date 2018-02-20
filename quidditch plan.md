@@ -26,9 +26,9 @@ Power Maneuvers, like Low Post, taking a Bludger
 ### Quidditch Transformation Steps
 
 1. Naming / Slight League Tweaks
-2. New Super-Base Ratings fit into the Core BBGM ratings. With Low Post, 2 pts, 3 pts. Make Seekers super-amazing 3pt shooters. 
-3. Revamp Game Sim to have new ratings / modeling / still roughly basketball inspired. Seekers seperated into a seperate winning track.
-4. Revamp League, make Scholastic Divisions have their own limitations, 
+2. Simple Changes / Seekers (3p) 
+3. Revamp Game Sim to have new ratings / modeling / still roughly basketball inspired.
+4. Revamp League, make Scholastic Divisions, Rec divisions have their own limitations, 
 and recruiting from Scholastic into Pro division. Retirements from Pro / Recruitment from Scholastic into Ministries / Department casual leagues.
 5. Revamp Game Sim more. Game Ends by Snitch or Mutual Agreement. Adjustment Snitch difficulty by Division.
 
@@ -47,5 +47,21 @@ Generate naming from British name lists (80%), German name lists (10%), French n
 Note: Started a regular BBGM playthrough as the Chudley Cannons with this version of the JSON
 The names are MUCH better than before. Still want to add German and French name bases (irish and bulgarian too?)
    
-### New Super-Base Ratings
+### Simple Changes / Seekers (3p)
+
+Change logic for the end of games, to be based on completed 3p percentage
+Make 3p attempts 10 - 30 times harder to make (how many 3s per game now?)
+Make only the 1st starter able to take 3s / or make them. (basically Seeker is first position, like the QB in the NFL / College Football simulators)
+
+Specifically:
+
+1 (done): If Quarter = 5, Quarter = 4 (don't end the regulation until a 3 is made)
+
+If stats for team0 tp > 0, then break from regulation.
+If a tie happens after that, then do overtime normally.
+
+2 PTers are 10 points.
+3 PTers are 150 points.
+
+Make all 3 base chances for 3pts 1 tenth of normal values.
 

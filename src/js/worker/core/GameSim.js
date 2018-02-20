@@ -341,9 +341,14 @@ class GameSim {
             }
             quarter += 1;
 
-            if (quarter === 5) {
-                break;
-            }
+			if(quarter === 5) {
+				quarter = 4;
+			}
+			
+			if(this.team[0].stat["tp"] > 0) {
+				break;
+			}
+
             this.team[0].stat.ptsQtrs.push(0);
             this.team[1].stat.ptsQtrs.push(0);
             this.t = g.quarterLength;
@@ -903,9 +908,9 @@ class GameSim {
             probMake =
                 this.team[this.o].player[p].compositeRating
                     .shootingThreePointer *
-                    0.35 +
-                0.24;
-            probAndOne = 0.01;
+                    0.035 +										// Divided  both multipliers by 10 to make catching Snitch (3p) harder. 
+                0.024;
+            probAndOne = 0.001;
         } else {
             const r1 =
                 Math.random() *
@@ -1091,7 +1096,7 @@ class GameSim {
         const p = this.playersOnCourt[this.o][shooter];
         this.recordStat(this.o, p, "fga");
         this.recordStat(this.o, p, "fg");
-        this.recordStat(this.o, p, "pts", 2); // 2 points for 2's
+        this.recordStat(this.o, p, "pts", 10); // 10 points for Goals
         if (type === "atRim") {
             this.recordStat(this.o, p, "fgaAtRim");
             this.recordStat(this.o, p, "fgAtRim");
@@ -1113,9 +1118,10 @@ class GameSim {
                 [this.team[this.o].player[p].name],
             );
         } else if (type === "threePointer") {
-            this.recordStat(this.o, p, "pts"); // Extra point for 3's
+            this.recordStat(this.o, p, "pts", 140); // 150 (net +140) points for Seeker catching Snitch
             this.recordStat(this.o, p, "tpa");
             this.recordStat(this.o, p, "tp");
+			this.t = 0;								// Quarter over, game over.
             this.recordPlay(andOne ? "tpAndOne" : "tp", this.o, [
                 this.team[this.o].player[p].name,
             ]);
