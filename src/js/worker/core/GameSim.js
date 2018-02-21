@@ -145,7 +145,7 @@ const pickPlayer = (
  * @return {number} Fatigue, from 0 to 1 (0 = lots of fatigue, 1 = none).
  */
 const fatigue = (energy: number): number => {
-    energy += 0.05;
+    energy += 0.02;
     if (energy > 1) {
         energy = 1;
     }
@@ -341,8 +341,8 @@ class GameSim {
             }
             quarter += 1;
 
-			if(quarter === 5) {
-				quarter = 4;
+			if(quarter === 21) {
+			    break;
 			}
 			
 			if(this.team[0].stat["tp"] > 0) {
