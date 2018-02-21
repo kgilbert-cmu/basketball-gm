@@ -631,11 +631,11 @@ class LogoAndText extends React.Component<LogoAndTextProps> {
                     }}
                 />
                 <span className="hidden-md hidden-sm hidden-xs">
-                    Basketball GM
+                    Quidditch GM
                 </span>
                 {lid === undefined ? (
                     <span className="visible-md visible-sm visible-xs">
-                        Basketball GM
+                        Quidditch GM
                     </span>
                 ) : null}
             </a>
