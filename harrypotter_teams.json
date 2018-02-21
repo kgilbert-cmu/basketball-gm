@@ -11,8 +11,8 @@
       "region": "Gryffindor",
       "name": "Lions",
       "abbrev": "GRY",
-      "imgURL": "http://i.imgur.com/z2xffBr.jpg?1",
-	  "pop": 6.0
+      "imgURL": "/img/logos/Gryffindor.png",
+	  "pop": 1.2
     },
     {
       "tid": 1,
@@ -21,8 +21,8 @@
       "region": "Slytherin",
       "name": "Serpents",
       "abbrev": "SLY",
-      "imgURL": "http://i.imgur.com/jAl7TK3.jpg?1",
-	  "pop": 8.0
+      "imgURL": "/img/logos/Slytherin.png",
+	  "pop": 1.4
     },
     {
       "tid": 2,
@@ -31,8 +31,8 @@
       "region": "Ravenclaw",
       "name": "Eagles",
       "abbrev": "RAV",
-      "imgURL": "http://i.imgur.com/cy2B0o9.jpg?1",
-	  "pop": 4.0
+      "imgURL": "/img/logos/Ravenclaw.jpg",
+	  "pop": 0.8
     },
     {
       "tid": 3,
@@ -41,8 +41,8 @@
       "region": "Hufflepuff",
       "name": "Badgers",
       "abbrev": "HUF",
-      "imgURL": "http://i.imgur.com/877q49u.jpg?1",
-	  "pop": 4.0
+      "imgURL": "/img/logos/Hufflepuff.png",
+	  "pop": 0.8
     },
     {
       "tid": 4,
@@ -51,8 +51,8 @@
       "region": "Hogwarts",
       "name": "Professors",
       "abbrev": "HOG",
-      "imgURL": "http://i.imgur.com/dXelhpC.jpg?1",
-      "pop": 4.0
+      "imgURL": "/img/logos/Professors.png",
+      "pop": 1.0
 	},
     {
       "tid": 5,
@@ -61,8 +61,8 @@
       "region": "Beauxbatons",
       "name": "Veelas",
       "abbrev": "BEA",
-      "imgURL": "http://i.imgur.com/M8TPCDs.jpg?1",
-	  "pop": 8.0
+      "imgURL": "/img/logos/Beauxbatons.png",
+	  "pop": 1.4
     },
     {
       "tid": 6,
@@ -71,8 +71,8 @@
       "region": "Durmstrang",
       "name": "Wizards",
       "abbrev": "DUR",
-      "imgURL": "http://i.imgur.com/08WbWee.jpg?1",
-	  "pop": 8.0
+      "imgURL": "/img/logos/Durmstrang.png",
+	  "pop": 1.4
     },
     {
       "tid": 7,
@@ -81,8 +81,8 @@
       "region": "Ilvermorny",
       "name": "Crows",
       "abbrev": "ILV",
-      "imgURL": "http://i.imgur.com/PsgSVSH.jpg?1",
-      "pop": 2.0
+      "imgURL": "/img/logos/Ilvermorny.png",
+      "pop": 0.8
     },
     {
       "tid": 8,
@@ -91,8 +91,8 @@
       "region": "Castelobruxo",
       "name": "Caipora",
       "abbrev": "CAS",
-      "imgURL": "http://i.imgur.com/UOcsnh1.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/Castelobruxo.png",
+	  "pop": 0.8
     },
     {
       "tid": 9,
@@ -101,8 +101,8 @@
       "region": "Koldovstoretz",
       "name": "Flying Trees",
       "abbrev": "KOL",
-      "imgURL": "http://i.imgur.com/Y0HlJdE.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/Koldovstoretz.png",
+	  "pop": 0.8
     },
     {
       "tid": 10,
@@ -111,8 +111,8 @@
       "region": "Mahoutokoro",
       "name": "Petrels",
       "abbrev": "MAH",
-      "imgURL": "http://i.imgur.com/wVoRYaY.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/Mahoutokoro.png",
+	  "pop": 0.8
     },
     {
       "tid": 11,
@@ -121,8 +121,8 @@
       "region": "Uagadou",
       "name": "Mountains",
       "abbrev": "UAG",
-      "imgURL": "http://i.imgur.com/TkzXSl8.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/Uagadou.png",
+	  "pop": 0.8
     },
     {
       "tid": 12,
@@ -131,8 +131,8 @@
       "region": "Salem",
       "name": "Witches",
       "abbrev": "SAL",
-      "imgURL": "http://i.imgur.com/N3dJEUA.jpg?1",
-      "pop": 3.0
+      "imgURL": "/img/logos/Salem.jpg",
+      "pop": 0.8
     },
     {
       "tid": 13,
@@ -141,8 +141,8 @@
       "region": "Broom Flying",
       "name": "Academy",
       "abbrev": "BRO",
-      "imgURL": "http://i.imgur.com/2oscJeq.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/BroomFlying.png",
+	  "pop": 0.8
     },
     {
       "tid": 14,
@@ -151,8 +151,8 @@
       "region": "Euro-Glyph",
       "name": "Languages",
       "abbrev": "EUR",
-      "imgURL": "http://i.imgur.com/lWKEExv.jpg?1",
-	  "pop": 2.0
+      "imgURL": "/img/logos/Euro-Glyph.png",
+	  "pop": 0.8
     },
     {
       "tid": 15,
@@ -161,8 +161,8 @@
       "region": "Auror",
       "name": "Elites",
       "abbrev": "AUR",
-      "imgURL": "http://i.imgur.com/ox9hgnO.jpg?1",
-	  "pop": 3.0
+      "imgURL": "/img/logos/Auror.jpg",
+	  "pop": 4.0
     },
     {
       "tid": 16,
@@ -171,7 +171,7 @@
       "region": "Mysterious",
       "name": "Unspeakables",
       "abbrev": "MYS",
-      "imgURL": "http://i.imgur.com/KqtEMAm.jpg?1",
+      "imgURL": "/img/logos/Mysterious.jpg",
 	  "pop": 3.0
     },
     {
@@ -181,8 +181,8 @@
       "region": "Muggle Artefact",
       "name": "Investigators",
       "abbrev": "ART",
-      "imgURL": "http://i.imgur.com/UqQGeo9.jpg?1",
-	  "pop": 3.0
+      "imgURL": "/img/logos/MuggleArtefacts.jpg",
+	  "pop": 1.5
     },
     {
       "tid": 18,
@@ -191,8 +191,8 @@
       "region": "Magical Creatures",
       "name": "Caretakers",
       "abbrev": "MAG",
-      "imgURL": "http://i.imgur.com/yOfSU4r.jpg?1",
-	  "pop": 3.0
+      "imgURL": "/img/logos/MagicalCreatures.png",
+	  "pop": 2.0
     },
     {
       "tid": 19,
@@ -201,8 +201,8 @@
       "region": "Wizengamot",
       "name": "Judges",
       "abbrev": "WIZ",
-      "imgURL": "http://i.imgur.com/ad5kh8O.jpg?1",
-	  "pop": 6.0
+      "imgURL": "/img/logos/Wizengamot.jpg",
+	  "pop": 4.0
     },
     {
       "tid": 20,
@@ -211,8 +211,8 @@
       "region": "Goblin",
       "name": "Bankers",
       "abbrev": "GOB",
-      "imgURL": "http://i.imgur.com/QtETVHW.jpg?1",
-	  "pop": 10.0
+      "imgURL": "/img/logos/Goblin.jpg",
+	  "pop": 2.0
     },
     {
       "tid": 21,
@@ -221,8 +221,8 @@
       "region": "Centaur",
       "name": "Augurers",
       "abbrev": "CEN",
-      "imgURL": "http://i.imgur.com/0Z35tor.jpg?1",
-      "pop": 4.0
+      "imgURL": "/img/logos/Centaur.jpg",
+      "pop": 1.0
     },
     {
       "tid": 22,
@@ -231,8 +231,8 @@
       "region": "House Elf",
       "name": "Socks",
       "abbrev": "ELF",
-      "imgURL": "http://i.imgur.com/oi2AEae.jpg?1",
-	  "pop": 1.5
+      "imgURL": "/img/logos/HouseElf.jpg",
+	  "pop": 0.6
     },
     {
       "tid": 23,
@@ -241,8 +241,8 @@
       "region": "Troll",
       "name": "Clubs",
       "abbrev": "TRO",
-      "imgURL": "http://i.imgur.com/FWoZZcd.jpg?1",
-      "pop": 1.5
+      "imgURL": "/img/logos/Troll.png",
+      "pop": 0.8
     },
     {
       "tid": 24,
@@ -251,8 +251,8 @@
       "region": "Dragon",
       "name": "Inferno",
       "abbrev": "DRA",
-      "imgURL": "http://i.imgur.com/PluRKDY.jpg?1",
-	  "pop": 4.0
+      "imgURL": "/img/logos/Dragon.jpg",
+	  "pop": 1.0
     },
 	{
       "tid": 25,
@@ -261,8 +261,8 @@
       "region": "Chudley",
       "name": "Cannons",
       "abbrev": "CHU",
-      "imgURL": "http://i.imgur.com/QhuZOm9.jpg?1",
-      "pop": 4.0
+      "imgURL": "/img/logos/Chudley.png",
+      "pop": 20.0
     },
     {
       "tid": 26,
@@ -271,8 +271,8 @@
       "region": "Puddlemere",
       "name": "United",
       "abbrev": "PUD",
-      "imgURL": "http://i.imgur.com/EHvaMIz.jpg?1",
-	  "pop": 4.0
+      "imgURL": "/img/logos/Puddlemere.png",
+	  "pop": 20.0
     },
     {
       "tid": 27,
@@ -281,8 +281,8 @@
       "region": "Appleby",
       "name": "Arrows",
       "abbrev": "APP",
-      "imgURL": "http://i.imgur.com/L0hs5St.jpg?1",
-	  "pop": 4.0
+      "imgURL": "/img/logos/Appleby.png",
+	  "pop": 20.0
     },
     {
       "tid": 28,
@@ -291,8 +291,8 @@
       "region": "Ireland",
       "name": "Shamrocks",
       "abbrev": "IRE",
-      "imgURL": "http://i.imgur.com/6vYQaDe.jpg?1",
-	  "pop": 8.0
+      "imgURL": "/img/logos/Ireland.jpg",
+	  "pop": 30.0
     },
     {
       "tid": 29,
@@ -301,8 +301,8 @@
       "region": "Bulgarian",
       "name": "Fire",
       "abbrev": "BUL",
-      "imgURL": "http://i.imgur.com/2XL3N7Y.jpg?1",
-	  "pop": 8.0
+      "imgURL": "/img/logos/Bulgaria.jpg",
+	  "pop": 30.0
     }
   ],
     "gameAttributes": [
@@ -322,7 +322,7 @@
                 {"did": 2, "cid": 0, "name": "Wizard Schools B"},
                 {"did": 3, "cid": 1, "name": "Ministry"},
                 {"did": 4, "cid": 1, "name": "Species"},
-                {"did": 5, "cid": 2, "name": "British Premier League"}
+                {"did": 5, "cid": 2, "name": "Premier League"}
             ]
 	},
 	{

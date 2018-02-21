@@ -7350,7 +7350,7 @@
       }
     },
     "react-sortable-hoc": {
-      "version": "git://github.com/dumbmatter/react-sortable-hoc.git#a38783cfbfdc2c3e4aed40314aa113d52052bc36",
+      "version": "github:dumbmatter/react-sortable-hoc#a38783cfbfdc2c3e4aed40314aa113d52052bc36",
       "requires": {
         "babel-runtime": "6.26.0",
         "invariant": "2.2.2",
