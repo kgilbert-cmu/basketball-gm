@@ -303,6 +303,116 @@
       "abbrev": "BUL",
       "imgURL": "/img/logos/Bulgaria.jpg",
 	  "pop": 30.0
+    },
+	{
+      "tid": 30,
+      "cid": 2,
+      "did": 5,
+      "region": "Ballycastle",
+      "name": "Bats",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+	{
+      "tid": 31,
+      "cid": 2,
+      "did": 5,
+      "region": "Banchory",
+      "name": "Bangers",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+	{
+      "tid": 32,
+      "cid": 2,
+      "did": 5,
+      "region": "Caerphilly",
+      "name": "Catapults",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+	{
+      "tid": 33,
+      "cid": 2,
+      "did": 5,
+      "region": "Falmouth",
+      "name": "Falcons",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+	{
+      "tid": 34,
+      "cid": 2,
+      "did": 5,
+      "region": "Holyhead",
+      "name": "Harpies",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+	{
+      "tid": 35,
+      "cid": 2,
+      "did": 5,
+      "region": "Kenmare",
+      "name": "Kestrels",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },	
+	{
+      "tid": 36,
+      "cid": 2,
+      "did": 5,
+      "region": "Montrose",
+      "name": "Magpies",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },	 
+ 	{
+      "tid": 37,
+      "cid": 2,
+      "did": 5,
+      "region": "Portree",
+      "name": "Pride",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },
+ 	{
+      "tid": 38,
+      "cid": 2,
+      "did": 5,
+      "region": "Tutshill",
+      "name": "Tornados",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },	
+ 	{
+      "tid": 39,
+      "cid": 2,
+      "did": 5,
+      "region": "Wigtown",
+      "name": "Wanderers",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
+    },	
+  	{
+      "tid": 40,
+      "cid": 2,
+      "did": 5,
+      "region": "Wimbourne",
+      "name": "Wasps",
+      "abbrev": "BAL",
+      "imgURL": "",
+	  "pop": 30.0
     }
   ],
     "gameAttributes": [
@@ -322,7 +432,7 @@
                 {"did": 2, "cid": 0, "name": "Wizard Schools B"},
                 {"did": 3, "cid": 1, "name": "Ministry"},
                 {"did": 4, "cid": 1, "name": "Species"},
-                {"did": 5, "cid": 2, "name": "Premier League"}
+                {"did": 5, "cid": 2, "name": "Brittish & Irish Quidditch League"}
             ]
 	},
 	{
