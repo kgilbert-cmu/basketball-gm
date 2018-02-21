@@ -904,13 +904,13 @@ class GameSim {
         ) {
             // Three pointer
             type = "threePointer";
-            probMissAndFoul = 0.02;
+            probMissAndFoul = 0;
             probMake =
                 this.team[this.o].player[p].compositeRating
                     .shootingThreePointer *
                     0.035 +										// Divided  both multipliers by 10 to make catching Snitch (3p) harder. 
                 0.024;
-            probAndOne = 0.001;
+            probAndOne = 0;
         } else {
             const r1 =
                 Math.random() *
@@ -1386,7 +1386,7 @@ class GameSim {
             ) {
                 // Between 60% and 90%
                 this.recordStat(this.o, p, "ft");
-                this.recordStat(this.o, p, "pts");
+                this.recordStat(this.o, p, "pts", 5);
                 this.recordPlay("ft", this.o, [
                     this.team[this.o].player[p].name,
                 ]);
