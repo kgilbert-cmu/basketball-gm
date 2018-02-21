@@ -145,7 +145,7 @@ const pickPlayer = (
  * @return {number} Fatigue, from 0 to 1 (0 = lots of fatigue, 1 = none).
  */
 const fatigue = (energy: number): number => {
-    energy += 0.02;
+    energy += 0.005;
     if (energy > 1) {
         energy = 1;
     }
@@ -934,8 +934,8 @@ class GameSim {
                 probMake =
                     this.team[this.o].player[p].compositeRating
                         .shootingMidRange *
-                        0.3 +
-                    0.29;
+                        0.15 +
+                    0.145;
                 probAndOne = 0.05;
             } else if (r2 > r3) {
                 // Dunk, fast break or half court
@@ -943,8 +943,8 @@ class GameSim {
                 probMissAndFoul = 0.37;
                 probMake =
                     this.team[this.o].player[p].compositeRating.shootingAtRim *
-                        0.3 +
-                    0.52;
+                        0.15 +
+                    0.26;
                 probAndOne = 0.25;
             } else {
                 // Post up
@@ -953,23 +953,23 @@ class GameSim {
                 probMake =
                     this.team[this.o].player[p].compositeRating
                         .shootingLowPost *
-                        0.3 +
-                    0.37;
+                        0.15 +
+                    0.185;
                 probAndOne = 0.15;
             }
         }
 
         probMake =
             (probMake -
-                0.25 * this.team[this.d].compositeRating.defense +
+                0.125 * this.team[this.d].compositeRating.defense +
                 this.synergyFactor *
                     (this.team[this.o].synergy.off -
-                        this.team[this.d].synergy.def)) *
+                        this.team[this.d].synergy.def)) * 0.5 *
             currentFatigue;
 
         // Assisted shots are easier
         if (passer !== undefined) {
-            probMake += 0.025;
+            probMake += 0.0125;
         }
 
         if (this.probBlk() > Math.random()) {
@@ -1381,8 +1381,8 @@ class GameSim {
             this.recordStat(this.o, p, "fta");
             if (
                 Math.random() <
-                this.team[this.o].player[p].compositeRating.shootingFT * 0.3 +
-                    0.6
+                this.team[this.o].player[p].compositeRating.shootingFT * 0.15 +
+                    0.3
             ) {
                 // Between 60% and 90%
                 this.recordStat(this.o, p, "ft");
