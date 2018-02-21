@@ -348,6 +348,10 @@ class GameSim {
 			if(this.team[0].stat["tp"] > 0) {
 				break;
 			}
+            
+            if(this.team[1].stat["tp"] > 0) {
+                break;   
+            }
 
             this.team[0].stat.ptsQtrs.push(0);
             this.team[1].stat.ptsQtrs.push(0);
@@ -978,19 +982,12 @@ class GameSim {
 
         // Make
         if (probMake > Math.random()) {
-            // And 1
-            if (probAndOne > Math.random()) {
-                return this.doFg(shooter, passer, type, true); // fg, orb, or drb
-            }
             return this.doFg(shooter, passer, type); // fg
         }
 
         // Miss, but fouled
         if (probMissAndFoul > Math.random()) {
-            if (type === "threePointer") {
-                return this.doFt(shooter, 3); // fg, orb, or drb
-            }
-            return this.doFt(shooter, 2); // fg, orb, or drb
+            return this.doFt(shooter, 1); // fg, orb, or drb
         }
 
         // Miss
