@@ -33,7 +33,7 @@ const calculatePER = (players, teams, league) => {
             uPER =
                 1 /
                 players[i].stats.min *
-                (players[i].stats.tp +
+                (28 * players[i].stats.tp +
                     2 / 3 * players[i].stats.ast +
                     (2 -
                         factor * (teams[tid].stats.ast / teams[tid].stats.fg)) *
