@@ -320,7 +320,7 @@
       "did": 5,
       "region": "Banchory",
       "name": "Bangers",
-      "abbrev": "BAL",
+      "abbrev": "BAN",
       "imgURL": "",
 	  "pop": 30.0
     },
@@ -330,7 +330,7 @@
       "did": 5,
       "region": "Caerphilly",
       "name": "Catapults",
-      "abbrev": "BAL",
+      "abbrev": "CAE",
       "imgURL": "",
 	  "pop": 30.0
     },
@@ -340,7 +340,7 @@
       "did": 5,
       "region": "Falmouth",
       "name": "Falcons",
-      "abbrev": "BAL",
+      "abbrev": "FAL",
       "imgURL": "",
 	  "pop": 30.0
     },
@@ -350,7 +350,7 @@
       "did": 5,
       "region": "Holyhead",
       "name": "Harpies",
-      "abbrev": "BAL",
+      "abbrev": "HOL",
       "imgURL": "",
 	  "pop": 30.0
     },
@@ -360,7 +360,7 @@
       "did": 5,
       "region": "Kenmare",
       "name": "Kestrels",
-      "abbrev": "BAL",
+      "abbrev": "KEN",
       "imgURL": "",
 	  "pop": 30.0
     },	
@@ -370,7 +370,7 @@
       "did": 5,
       "region": "Montrose",
       "name": "Magpies",
-      "abbrev": "BAL",
+      "abbrev": "MON",
       "imgURL": "",
 	  "pop": 30.0
     },	 
@@ -380,7 +380,7 @@
       "did": 5,
       "region": "Portree",
       "name": "Pride",
-      "abbrev": "BAL",
+      "abbrev": "POR",
       "imgURL": "",
 	  "pop": 30.0
     },
@@ -390,7 +390,7 @@
       "did": 5,
       "region": "Tutshill",
       "name": "Tornados",
-      "abbrev": "BAL",
+      "abbrev": "TUT",
       "imgURL": "",
 	  "pop": 30.0
     },	
@@ -400,7 +400,7 @@
       "did": 5,
       "region": "Wigtown",
       "name": "Wanderers",
-      "abbrev": "BAL",
+      "abbrev": "WIG",
       "imgURL": "",
 	  "pop": 30.0
     },	
@@ -410,7 +410,7 @@
       "did": 5,
       "region": "Wimbourne",
       "name": "Wasps",
-      "abbrev": "BAL",
+      "abbrev": "WIM",
       "imgURL": "",
 	  "pop": 30.0
     }
