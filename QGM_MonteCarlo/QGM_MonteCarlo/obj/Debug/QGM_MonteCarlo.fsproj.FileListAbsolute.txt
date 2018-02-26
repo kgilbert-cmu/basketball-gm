@@ -1,0 +1,8 @@
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\QGM_MonteCarlo.exe.config
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\QGM_MonteCarlo.XML
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\QGM_MonteCarlo.exe
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\QGM_MonteCarlo.pdb
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\FSharp.Core.dll
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\bin\Debug\FSharp.Core.xml
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\obj\Debug\QGM_MonteCarlo.exe
+C:\Users\aap\Documents\GitHub\basketball-gm\QGM_MonteCarlo\QGM_MonteCarlo\obj\Debug\QGM_MonteCarlo.pdb
