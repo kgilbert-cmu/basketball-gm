@@ -114,6 +114,9 @@ module MonteModel =
                     if tov then poss
                     else opp
 
-                runModelRec newPoss newOpp newStatus
+                if tov then
+                    1.0 -  runModelRec newPoss newOpp newStatus
+                else
+                    runModelRec newPoss newOpp newStatus
 
         runModelRec usAdj themAdj startStatus

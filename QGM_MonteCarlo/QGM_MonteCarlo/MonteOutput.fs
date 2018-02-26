@@ -41,7 +41,7 @@ module MonteOutput =
     let writeSampleResult (writer : System.IO.TextWriter) (player : Player) (score : double) = 
         match player with
         | { Prop3 = prop3; TwoPTPct = twoPCT; ThreePTPct = threePCT; TwoFTRate = ftPer2; FTPct = ftPCT; BPct = bPCT; SPct = sPCT; ORBRate = orbR; DRBRate = drbR; } ->
-            fprintf writer "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.1f" prop3 threePCT twoPCT ftPCT ftPer2 bPCT sPCT orbR drbR score
+            fprintfn writer "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.1f" prop3 threePCT twoPCT ftPCT ftPer2 bPCT sPCT orbR drbR score
 
     let ctFromBand (pr : ParameterRange) = 
         match pr with
