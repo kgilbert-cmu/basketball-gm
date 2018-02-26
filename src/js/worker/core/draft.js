@@ -88,7 +88,7 @@ async function genPlayers(
 
     let draftYear = g.season;
 
-    let baseAge = 19;
+    let baseAge = 11;
     if (newLeague) {
         // New league, creating players for draft in same season and following 2 seasons
         if (tid === PLAYER.UNDRAFTED_2) {
@@ -113,8 +113,7 @@ async function genPlayers(
         );
 
         const profile = profiles[6];
-        const agingYears = random.randInt(0, 3);
-
+		
         const p = player.generate(
             tid,
             baseAge,
@@ -125,82 +124,10 @@ async function genPlayers(
             false,
             scoutingRank,
         );
-        player.develop(p, agingYears, true);
 
         // Update player values after ratings changes
         await player.updateValues(p);
         await idb.cache.players.add(p);
-    }
-
-    // Easter eggs!
-    if (Math.random() < 1 / 100000) {
-        const p = player.generate(
-            tid,
-            19,
-            profiles[1],
-            90,
-            90,
-            draftYear,
-            false,
-            scoutingRank,
-        );
-        p.born.year = draftYear - 48;
-        p.born.loc = "Los Angeles, CA";
-        p.college = "Washington State University";
-        p.firstName = "LaVar";
-        p.hgt = 78;
-        p.imgURL = "/img/lavar.jpg";
-        p.lastName = "Ball";
-        p.weight = 250;
-        await player.updateValues(p);
-        const pid = await idb.cache.players.add(p);
-        if (typeof pid === "number") {
-            await logEvent({
-                type: "playerFeat",
-                text: `<a href="${helpers.leagueUrl(["player", pid])}">${
-                    p.firstName
-                } ${
-                    p.lastName
-                }</a> got sick of the haters and decided to show the world how a big baller plays.`,
-                showNotification: false,
-                pids: [pid],
-                tids: [g.userTid],
-            });
-        }
-    } else if (Math.random() < 1 / 100000) {
-        const p = player.generate(
-            tid,
-            19,
-            profiles[1],
-            90,
-            90,
-            draftYear,
-            false,
-            scoutingRank,
-        );
-        p.born.year = draftYear - 71;
-        p.born.loc = "Queens, NY";
-        p.college = "Wharton";
-        p.firstName = "Donald";
-        p.hgt = 75;
-        p.imgURL = "/img/trump.jpg";
-        p.lastName = "Trump";
-        p.weight = 240;
-        p.ratings[0].pss = 0;
-        p.ratings[0].skills = ["Dp"];
-        await player.updateValues(p);
-        const pid = await idb.cache.players.add(p);
-        if (typeof pid === "number") {
-            await logEvent({
-                type: "playerFeat",
-                text: `<a href="${helpers.leagueUrl(["player", pid])}">${
-                    p.firstName
-                } ${p.lastName}</a> decided to Make Basketball GM Great Again.`,
-                showNotification: false,
-                pids: [pid],
-                tids: [g.userTid],
-            });
-        }
     }
 }
 
