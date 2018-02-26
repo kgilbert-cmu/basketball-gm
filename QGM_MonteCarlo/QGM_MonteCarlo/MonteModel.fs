@@ -102,9 +102,9 @@ module MonteModel =
             
                 let newStatus =
                     if tov then 
-                        {status with PossessionsLeft = status.PossessionsLeft - netPoss; WinAmount = -(status.WinAmount + points)}
+                        {status with PossessionsLeft = status.PossessionsLeft + netPoss; WinAmount = -(status.WinAmount + points)}
                     else
-                        {status with PossessionsLeft = status.PossessionsLeft - netPoss; WinAmount = status.WinAmount + points}
+                        {status with PossessionsLeft = status.PossessionsLeft + netPoss; WinAmount = status.WinAmount + points}
                     
                 let newPoss = 
                     if tov then opp
