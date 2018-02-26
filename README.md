@@ -9,16 +9,12 @@ An overhaul to write Quidditch-GM, a continuation of work from hpteam, but now w
 Very much in beginning stages.
 
 Some initial changes and test plays at reddit.com/r/quidditchgm
+Blog posts on change planning and programming and testing at: https://mwanderer.blogspot.com/
 
+In order to test or play with this, you need to install this locally, as indicated by Dumbmatter in the developer steps below.
 
-## Normal Readme Starts
-
-A single-player basketball simulation game. Make trades, set rosters, draft
-players, and try to build the next dynasty, all from within your web browser.
-The game is implemented entirely in client-side JavaScript, backed by IndexedDB.
-
-Copyright (C) Jeremy Scheff. All rights reserved.
-
+Basketball GM Copyright (C) Jeremy Scheff. All rights reserved.
+His Info
 * Email: commissioner@basketball-gm.com
 * Website: <https://basketball-gm.com/>
 * Development: <https://github.com/dumbmatter/basketball-gm>
