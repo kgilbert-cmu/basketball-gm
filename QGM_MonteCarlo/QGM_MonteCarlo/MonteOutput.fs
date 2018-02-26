@@ -36,12 +36,16 @@ module MonteOutput =
         }
 
     let writeCSVHeader (writer : System.IO.TextWriter) = 
-        writer.WriteLine("3PA/FGA,3P%,2P%,FT%,FT/2PA,B%,S%,ORBR,DRBR,Wins")
+        writer.WriteLine("3P/FGA,2P/FGA,FT/FGA,B%,S%,ORBR,DRBR,Wins")
 
     let writeSampleResult (writer : System.IO.TextWriter) (player : Player) (score : double) = 
         match player with
         | { Prop3 = prop3; TwoPTPct = twoPCT; ThreePTPct = threePCT; TwoFTRate = ftPer2; FTPct = ftPCT; BPct = bPCT; SPct = sPCT; ORBRate = orbR; DRBRate = drbR; } ->
-            fprintfn writer "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.1f" prop3 threePCT twoPCT ftPCT ftPer2 bPCT sPCT orbR drbR score
+            let threePerFGA = threePCT * prop3
+            let twoPerFGA = twoPCT * (1.0 - prop3)
+            let ftPerFGA = ftPer2 * (1.0 - prop3) * ftPCT
+
+            fprintfn writer "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.1f" threePerFGA twoPerFGA ftPerFGA bPCT sPCT orbR drbR score
 
     let ctFromBand (pr : ParameterRange) = 
         match pr with
@@ -86,6 +90,8 @@ module MonteOutput =
 
         let writer = System.IO.File.CreateText("results.csv")
         
+        writeCSVHeader writer
+
         players
         |> Seq.iter 
             (fun p1 -> 

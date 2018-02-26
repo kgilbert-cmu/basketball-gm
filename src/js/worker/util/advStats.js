@@ -19,25 +19,14 @@ const calculatePER = (players, teams, league) => {
     league.aPER = 0;
     for (let i = 0; i < players.length; i++) {
         const tid = players[i].tid;
-	
-		let ThreePct = players[i].stats.tp / players[i].stats.tpa
-		let TwoPct = (players[i].stats.fg - players[i].stats.tp) / (players[i].stats.fga - players[i].stats.tpa);
-		let FTPer2 = players[i].stats.fta / (players[i].stats.fga - players[i].stats.tpa);
+		
+		let ThreePct = players[i].stats.tp / players[i].stats.fga;
+		let TwoPct = (players[i].stats.fg - players[i].stats.tp) / players[i].stats.fga;
+		let FTPct = players[i].stats.fta / players[i].stats.fga;
 		let BPct = players[i].stats.blk / (0.284 * players[i].stats.min);
 		let SPct = players[i].stats.stl / (0.284 * players[i].stats.min);
 		let ORBR = players[i].stats.orb / players[i].stats.min;
 		let DRBR = players[i].stats.drb / players[i].stats.min;
-		let ThreeFGA = players[i].stats.tpa / players[i].stats.fga;
-		let FTPct = players[i].stats.ft / players[i].stats.fta;
-		
-		if(players[i].stats.tpa === 0) {
-			ThreePct = 0;
-		}
-		
-		if(players[i].stats.fga - players[i].stats.tpa === 0) {
-			TwoPct = 0;
-			FTPer2 = 0;
-		}
 		
 		if(players[i].stats.min === 0) {
 			BPct = 0;
@@ -47,17 +36,15 @@ const calculatePER = (players, teams, league) => {
 		}
 		
 		if(players[i].stats.fga === 0) {
-			ThreeFGA = 0;
-		}
-		
-		if(players[i].stats.fta === 0) {
+			ThreePct = 0;
+			TwoPct = 0;
 			FTPct = 0;
 		}
 
         let uPER;
 		
 		if(players[i].stats.min > 0) {
-			uPER = -260 + 850 * ThreeFGA + 4800 * ThreePct + 750 * TwoPct + 90 * FTPct + 110 * FTPer2 + 390 * BPct + 450 * SPct + 570 * ORBR + 250 * DRBR;
+			uPER = -50 + 22000 * ThreePct + 1000 * TwoPct + 480 * FTPct + 360 * BPct + 460 * SPct + 530 * ORBR + 260 * DRBR;
 		}
 		else {
 			uPER = 0;
