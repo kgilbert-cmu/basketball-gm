@@ -2,9 +2,46 @@ Don't read much into the release dates. Changes are pushed live as often as
 possible, regardless of whether I make an official release with a new version
 number or not.
 
-# 4.0.0 (2017-04-01)
+# 5.1.0 (in progress)
 
-- Previously, the version number was incremented when the previous version was done, and then the date was assigned for the previous version then. Now, the version and date will be assigned at the same time, and then features and improvements will gradualyl be added to the version.
+## Gameplay and UI
+
+- [Frivolities](https://basketball-gm.com/blog/2019/05/frivolities/)
+- [New achievements](https://basketball-gm.com/blog/2019/07/new-achievements/)
+
+## Technical details
+
+- [Refactored how draft classes are stored, allowing arbitrary future draft classes to be specified in a league file](https://basketball-gm.com/blog/2019/07/far-future-draft-classes/)
+
+# 5.0.0 (2019-05-25)
+
+## Gameplay and UI
+
+- This is no longer just Basketball GM, it's also Football GM!
+- ["Untouchable" players and picks in trades](https://basketball-gm.com/blog/2018/10/untouchable-players-and-picks-in-trades/)
+- [New options: hard/soft cap and playoff byes](https://basketball-gm.com/blog/2018/11/new-options-hard-soft-cap-and-playoff-byes/)
+
+## Technical details
+
+- Refactored everything to support building Basketball GM and Football GM while sharing as much code as possible
+
+# 4.1.0 (2018-10-07)
+
+## Gameplay and UI
+
+- [Major changes to player ratings and development](https://basketball-gm.com/blog/2018/02/player-ratings-and-development-beta/)
+- [Performance improvements in large leagues](https://basketball-gm.com/blog/2018/04/performance-improvements-in-large-leagues/)
+- [Relatives - fathers, sons, and brothers](https://basketball-gm.com/blog/2018/05/relatives-fathers-sons-and-brothers/)
+- [Draft day trades](https://basketball-gm.com/blog/2018/05/draft-day-trades/)
+- [Option to change difficulty level](https://basketball-gm.com/blog/2018/06/difficulty-levels/)
+- [Lots of small UI improvements](https://basketball-gm.com/blog/2018/10/lots-of-small-ui-improvements/)
+
+## Technical details
+
+- Finally switched from AppCache to a service worker for offline support
+- Upgraded from Bootstrap 3 to Bootstrap 4, and make a lot better use of Sass
+
+# 4.0.0 (2018-03-07)
 
 ## Gameplay and UI
 

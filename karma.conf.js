@@ -1,19 +1,24 @@
 /* eslint-env node */
 
-module.exports = function (config) {
+module.exports = function(config) {
     config.set({
-        frameworks: ['mocha', 'browserify', 'source-map-support'],
+        frameworks: ["mocha", "browserify", "source-map-support"],
 
-        files: ['src/js/test/index.js', 'src/js/test/**/*.js'],
+        files: [
+            "src/deion/test/index.js",
+            "src/basketball/worker/index.js", // For overrides
+            "src/**/*.test.js",
+            "src/deion/test/**/*.js",
+        ],
 
         preprocessors: {
-            'src/js/**/*.js': ['browserify'],
+            "src/**/*.js": ["browserify"],
         },
 
         // http://stackoverflow.com/a/42379383/786644
         browserConsoleLogOptions: {
             terminal: true,
-            level: '',
+            level: "",
         },
 
         autoWatch: false,
@@ -22,13 +27,25 @@ module.exports = function (config) {
 
         browserify: {
             debug: true,
-            transform: ['babelify'],
+            transform: [
+                "babelify",
+                ["envify", { SPORT: "basketball" }],
+                [
+                    "aliasify",
+                    {
+                        aliases: {
+                            "league-schema.json": `./public/football/files/league-schema.json`,
+                        },
+                    },
+                ],
+            ],
         },
 
         browserNoActivityTimeout: 5 * 60 * 1000, // 5 minutes
+        browserDisconnectTimeout: 5 * 60 * 1000, // 5 minutes
 
-        reporters: ['mocha'],
+        reporters: ["mocha"],
 
-        browsers: ['Chrome', 'Firefox'],
+        browsers: ["ChromeHeadless", "FirefoxHeadless"],
     });
 };

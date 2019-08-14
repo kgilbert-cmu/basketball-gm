@@ -1,19 +1,18 @@
 // @flow
 
-const chokidar = require('chokidar');
-const build = require('./buildFuncs');
+const chokidar = require("chokidar");
+const build = require("./buildFuncs");
 
-// Create the watcher.
-const watcher = chokidar.watch('src/css', {});
+console.log("Watching CSS files...");
 
-// Create the function to run.
-function commands() {
-    build.minifyCss();
-}
+const watcher = chokidar.watch("public/css", {});
 
-// Run the commands once first.
-commands();
+const buildCSS = () => {
+    build.buildCSS(true);
+};
 
-watcher.on('change', () => {
-    commands();
+buildCSS();
+
+watcher.on("change", () => {
+    buildCSS();
 });

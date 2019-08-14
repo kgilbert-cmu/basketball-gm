@@ -1,22 +1,12 @@
 // @flow
 
-const replace = require("replace");
-const build = require('./buildFuncs');
+const fs = require("fs");
+const build = require("./buildFuncs");
 
 build.reset();
 build.copyFiles();
 
-const rev = build.genRev();
-replace({
-    regex: "REV_GOES_HERE",
-    replacement: rev,
-    paths: ["build/index.html"],
-    silent: true,
-});
+// Remove service worker, so I don't have to deal with it being wonky in dev
+fs.unlinkSync("build/sw.js");
 
-replace({
-    regex: '-" \\+ bbgmVersion \\+ "',
-    replacement: "",
-    paths: ["build/index.html"],
-    silent: true,
-});
+build.setTimestamps(true);
