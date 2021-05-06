@@ -51,7 +51,7 @@
     "react-dom": "15.6.1",
     "react-overlays": "0.7.0",
     "react-sortable-hoc": "dumbmatter/react-sortable-hoc#clonedNode-in-onSortStart",
-    "underscore": "1.8.3",
+    "underscore": "1.12.1",
     "url-search-params-polyfill": "1.2.0",
     "whatwg-fetch": "2.0.3"
   },
